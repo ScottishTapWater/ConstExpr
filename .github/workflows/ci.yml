@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and validate package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: 0.0.0-ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore src/ConstExpr.slnx
+      - name: Build
+        run: dotnet build src/ConstExpr.slnx -c Release --no-restore -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Check formatting
+        run: dotnet format src/ConstExpr.slnx --verify-no-changes --no-restore
+      - name: Pack
+        run: dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/packages -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Check package and generator loading
+        run: bash .github/scripts/check-package.sh "$VERSION"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error

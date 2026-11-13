@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'global.json'
+      - '.editorconfig'
+      - '.archonanalysers'
+      - 'README.md'
+      - '.github/workflows/cd.yml'
+      - '.github/scripts/check-package.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.semver.outputs.nextStrict }}
+      tag: ${{ steps.semver.outputs.next }}
+    steps:
+      - name: Calculate next version
+        id: semver
+        uses: ietf-tools/semver-action@v1.11.0
+        with:
+          token: ${{ github.token }}
+          branch: ${{ github.sha }}
+          fallbackTag: v0.0.0
+          minorList: feat
+          patchList: fix,perf
+          noNewCommitBehavior: silent
+          noVersionBumpBehavior: silent
+  release:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+      - name: Restore
+        run: dotnet restore src/ConstExpr.slnx
+      - name: Build
+        run: dotnet build src/ConstExpr.slnx -c Release --no-restore -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Check formatting
+        run: dotnet format src/ConstExpr.slnx --verify-no-changes --no-restore
+      - name: Pack
+        run: dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/packages -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
+      - name: Check package and generator loading
+        run: bash .github/scripts/check-package.sh "$VERSION"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+      - name: NuGet trusted publishing login
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Publish to NuGet.org
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push 'artifacts/packages/*.nupkg' --source https://api.nuget.org/v3/index.json --api-key "$NUGET_API_KEY" --skip-duplicate
+      - name: Publish to GitHub Packages
+        env:
+          PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+        run: dotnet nuget push 'artifacts/packages/*.nupkg' --source "$PACKAGE_SOURCE" --api-key "$GH_TOKEN" --skip-duplicate
+      - name: Create GitHub release
+        env:
+          RELEASE_TAG: ${{ needs.version.outputs.tag }}
+        run: gh release create "$RELEASE_TAG" artifacts/packages/*.nupkg --target "$GITHUB_SHA" --generate-notes
