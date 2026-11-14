@@ -1,3 +1,5 @@
 <Solution>
   <Project Path="ConstExpr/ConstExpr.csproj" />
+  <Project Path="ConstExpr.Core/ConstExpr.Core.csproj" />
+  <Project Path="ConstExpr.Roslyn/ConstExpr.Roslyn.csproj" />
 </Solution>
