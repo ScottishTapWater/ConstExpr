@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis;
 
-namespace ConstExpr.External;
+namespace ConstExpr.Roslyn.Generators;
 
 /// <summary>
 /// Provides the ConstExpr incremental source generator entry point.

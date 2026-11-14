@@ -1,2 +1,1 @@
-archon_001.internal_namespace_slugs = Internal
-archon_002.public_namespace_slugs = External
+archon_003.forbidden_references = ConstExpr->ConstExpr.Core, ConstExpr->ConstExpr.Roslyn, ConstExpr->Microsoft.CodeAnalysis*, ConstExpr.Core->ConstExpr.Roslyn, ConstExpr.Core->Microsoft.CodeAnalysis*
