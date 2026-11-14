@@ -69,7 +69,7 @@ jobs:
         run: dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/packages -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
       - name: Check package and generator loading
         run: bash .github/scripts/check-package.sh "$VERSION"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: release-packages
           path: artifacts/packages/*.nupkg
