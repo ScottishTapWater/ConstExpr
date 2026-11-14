@@ -65,6 +65,8 @@ jobs:
         run: dotnet build src/ConstExpr.slnx -c Release --no-restore -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
       - name: Check formatting
         run: dotnet format src/ConstExpr.slnx --verify-no-changes --no-restore
+      - name: Test
+        run: dotnet test --solution src/ConstExpr.slnx -c Release --no-build --no-restore --report-trx --results-directory "$GITHUB_WORKSPACE/artifacts/test-results"
       - name: Pack
         run: dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/packages -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
       - name: Check package and generator loading
@@ -91,3 +93,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.version.outputs.tag }}
         run: gh release create "$RELEASE_TAG" artifacts/packages/*.nupkg --target "$GITHUB_SHA" --generate-notes
+      - name: Upload test results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: release-test-results
+          path: artifacts/test-results/
+          if-no-files-found: warn

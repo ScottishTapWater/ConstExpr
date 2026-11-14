@@ -2,19 +2,21 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The initial project contains an empty `IIncrementalGenerator.Initialize` entry point. It does not generate source or report diagnostics yet.
+The generator entry point is empty. `[ConstExpr]` is available, and Core evaluation and serialisation entry points throw `NotImplementedException`. The active test suite describes the intended behaviour and is deliberately red until implementation.
 
 ## Structure
 
 | Project | Responsibility |
 | --- | --- |
-| `ConstExpr` | Attributes and application-facing contracts. Empty for now. |
-| `ConstExpr.Core` | Evaluation, serialisation, and result handling, independent of Roslyn. Empty for now. |
+| `ConstExpr` | The method-only `[ConstExpr]` attribute and application-facing contracts. |
+| `ConstExpr.Core` | Roslyn-independent evaluation and serialisation stubs. |
 | `ConstExpr.Roslyn` | Compiler integration and the empty generator entry point in `ConstExpr.Roslyn.Generators`. |
+| `ConstExpr.Core.Tests` | TUnit tests for evaluation and serialisation. |
+| `ConstExpr.Roslyn.Tests` | Compiler controls, pipeline tests, call-site theories, and source-edit tests. |
 
 Roslyn references Core and contracts. Core references contracts. ArchonAnalysers enforces this direction and forbids `Microsoft.CodeAnalysis*` assembly references from Core and contracts. It is a private development dependency in every project and is excluded from the consumer package.
 
-All three projects target `netstandard2.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three assemblies under `analyzers/dotnet/cs` for generator dependency resolution. Core and Roslyn are not runtime references for applications. No Archon or Roslyn package dependencies are exposed to consumers.
+The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. Core and Roslyn are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
 
 The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK.
 
@@ -29,6 +31,14 @@ bash .github/scripts/check-package.sh 0.1.0
 ```
 
 The package check validates the NuGet layout and builds a consumer that loads the packaged generator.
+
+## Tests
+
+```sh
+dotnet test --solution src/ConstExpr.slnx -c Release --no-build --no-restore --report-trx --results-directory "$PWD/artifacts/test-results"
+```
+
+The initial suite has 38 cases: 7 controls and characterisation cases pass, and 31 behaviour cases fail because implementation is missing. No cases are skipped. See [the test suite reference](docs/testing.md) for the expected failures and coverage.
 
 ## Releases
 
