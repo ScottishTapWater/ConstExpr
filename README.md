@@ -6,9 +6,17 @@ The initial project contains an empty `IIncrementalGenerator.Initialize` entry p
 
 ## Structure
 
-`src/ConstExpr/External` contains public entry points in `ConstExpr.External`. Internal implementation belongs in `src/ConstExpr/Internal`, under `ConstExpr.Internal`. ArchonAnalysers enforces namespace accessibility through `.archonanalysers`.
+| Project | Responsibility |
+| --- | --- |
+| `ConstExpr` | Attributes and application-facing contracts. Empty for now. |
+| `ConstExpr.Core` | Evaluation, serialisation, and result handling, independent of Roslyn. Empty for now. |
+| `ConstExpr.Roslyn` | Compiler integration and the empty generator entry point in `ConstExpr.Roslyn.Generators`. |
 
-The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK. Its assembly targets `netstandard2.0` and is packaged under `analyzers/dotnet/cs`, with no runtime library or Roslyn package dependencies.
+Roslyn references Core and contracts. Core references contracts. ArchonAnalysers enforces this direction and forbids `Microsoft.CodeAnalysis*` assembly references from Core and contracts. It is a private development dependency in every project and is excluded from the consumer package.
+
+All three projects target `netstandard2.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three assemblies under `analyzers/dotnet/cs` for generator dependency resolution. Core and Roslyn are not runtime references for applications. No Archon or Roslyn package dependencies are exposed to consumers.
+
+The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK.
 
 ## Build and check the package
 

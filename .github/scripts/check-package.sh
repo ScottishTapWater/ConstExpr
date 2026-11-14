@@ -9,19 +9,54 @@ consumer_dir="$(mktemp -d)"
 trap 'rm -rf "$consumer_dir"' EXIT
 
 unzip -Z1 "$package" > "$consumer_dir/contents.txt"
-grep -Fx 'analyzers/dotnet/cs/ConstExpr.dll' "$consumer_dir/contents.txt"
+cat > "$consumer_dir/expected-assemblies.txt" <<'EOF'
+analyzers/dotnet/cs/ConstExpr.Core.dll
+analyzers/dotnet/cs/ConstExpr.Roslyn.dll
+analyzers/dotnet/cs/ConstExpr.dll
+lib/netstandard2.0/ConstExpr.dll
+EOF
+grep '\.dll$' "$consumer_dir/contents.txt" | sort > "$consumer_dir/actual-assemblies.txt"
+diff -u "$consumer_dir/expected-assemblies.txt" "$consumer_dir/actual-assemblies.txt"
 grep -Fx 'README.md' "$consumer_dir/contents.txt"
-if grep -Eq '^(lib|ref)/|^analyzers/.*(Microsoft\.CodeAnalysis|ArchonAnalysers).*\.dll$' "$consumer_dir/contents.txt"; then
-  echo 'The package must contain only the ConstExpr analyser assembly, with no runtime assets.' >&2
+if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis' "$consumer_dir/contents.txt"; then
+  echo 'Build-time dependencies must not be bundled in the package.' >&2
   exit 1
 fi
 unzip -p "$package" ConstExpr.nuspec > "$consumer_dir/ConstExpr.nuspec"
-if grep -q '<dependency ' "$consumer_dir/ConstExpr.nuspec"; then
-  echo 'The analyser package must not expose build-time package dependencies.' >&2
+if grep '<dependency ' "$consumer_dir/ConstExpr.nuspec" | grep -v 'id="NETStandard.Library"'; then
+  echo 'The package must not expose build-time package dependencies.' >&2
   exit 1
 fi
 
-cat > "$consumer_dir/Consumer.csproj" <<EOF
+mkdir "$consumer_dir/application" "$consumer_dir/driver"
+cat > "$consumer_dir/application/Consumer.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ConstExpr" Version="$version" />
+  </ItemGroup>
+</Project>
+EOF
+cat > "$consumer_dir/application/Example.cs" <<'EOF'
+namespace Consumer;
+
+public sealed class Example;
+EOF
+dotnet restore "$consumer_dir/application/Consumer.csproj" --source "$package_dir" --source https://api.nuget.org/v3/index.json --packages "$consumer_dir/packages"
+dotnet build "$consumer_dir/application/Consumer.csproj" -c Release --no-restore
+if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis|ConstExpr\.Core|ConstExpr\.Roslyn' "$consumer_dir/application/bin/Release/net10.0/Consumer.deps.json"; then
+  echo 'Build-time dependencies must not enter the application runtime dependency graph.' >&2
+  exit 1
+fi
+if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis' "$consumer_dir/application/obj/project.assets.json"; then
+  echo 'Build-time packages must not be restored for consumers.' >&2
+  exit 1
+fi
+
+cat > "$consumer_dir/driver/Driver.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -29,12 +64,11 @@ cat > "$consumer_dir/Consumer.csproj" <<EOF
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ConstExpr" Version="$version" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
   </ItemGroup>
 </Project>
 EOF
-cat > "$consumer_dir/Consumer.cs" <<'EOF'
+cat > "$consumer_dir/driver/Program.cs" <<'EOF'
 using System;
 using System.Linq;
 using System.Reflection;
@@ -61,7 +95,7 @@ internal static class Program
 }
 EOF
 
-dotnet restore "$consumer_dir/Consumer.csproj" --source "$package_dir" --source https://api.nuget.org/v3/index.json --packages "$consumer_dir/packages"
-dotnet build "$consumer_dir/Consumer.csproj" -c Release --no-restore
-unzip -p "$package" analyzers/dotnet/cs/ConstExpr.dll > "$consumer_dir/ConstExpr.dll"
-dotnet run --project "$consumer_dir/Consumer.csproj" -c Release --no-build --no-restore -- "$consumer_dir/ConstExpr.dll"
+dotnet restore "$consumer_dir/driver/Driver.csproj" --source https://api.nuget.org/v3/index.json --packages "$consumer_dir/packages"
+dotnet build "$consumer_dir/driver/Driver.csproj" -c Release --no-restore
+unzip -j "$package" 'analyzers/dotnet/cs/*.dll' -d "$consumer_dir/assemblies"
+dotnet run --project "$consumer_dir/driver/Driver.csproj" -c Release --no-build --no-restore -- "$consumer_dir/assemblies/ConstExpr.Roslyn.dll"
