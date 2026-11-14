@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ArchonSettingsFile>$(MSBuildThisFileDirectory)../.archonanalysers</ArchonSettingsFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ArchonAnalysers" Version="1.0.1" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
