@@ -38,8 +38,6 @@ The package check validates the NuGet layout and builds a consumer that loads th
 dotnet test --solution src/ConstExpr.slnx -c Release --no-build --no-restore --report-trx --results-directory "$PWD/artifacts/test-results"
 ```
 
-The initial suite has 38 cases: 7 controls and characterisation cases pass, and 31 behaviour cases fail because implementation is missing. No cases are skipped. See [the test suite reference](docs/testing.md) for the expected failures and coverage.
-
 ## Releases
 
 CI builds, checks formatting, and validates the NuGet package on pull requests. CD runs on changes to `main`, calculates a version from conventional commits, and publishes to NuGet.org and GitHub Packages before creating a GitHub release. `v0.0.0` marks the initial repository commit for version calculation. CD also supports manual dispatch.
