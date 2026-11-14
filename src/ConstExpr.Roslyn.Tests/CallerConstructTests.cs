@@ -13,7 +13,7 @@ public sealed class CallerConstructTests
 	[Arguments("generic caller", "static int Next<T>() => Counter.CountUp();", "Next<string>()")]
 	[Arguments("iterator", "static IEnumerable<int> Next() { yield return Counter.CountUp(); }", "System.Linq.Enumerable.Single(Next())")]
 	[Arguments("async method", "static async Task<int> Next() { await Task.Yield(); return Counter.CountUp(); }", "await Next()")]
-	public async Task CallInsideConstructUsesTheBakedResult(string name, string declarations, string expression)
+	public async Task CallsInsideCallerConstructsReturnPrecomputedResults(string name, string declarations, string expression)
 	{
 		string caller = FixtureSources.Caller(expression, declarations);
 		if (name == "async method")

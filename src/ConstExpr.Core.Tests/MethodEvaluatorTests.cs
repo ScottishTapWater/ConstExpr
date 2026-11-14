@@ -9,7 +9,7 @@ namespace ConstExpr.Core.Tests;
 public sealed class MethodEvaluatorTests
 {
 	[Test]
-	public async Task EvaluatesCountUpToOne()
+	public async Task EvaluationExecutesTheSuppliedMethodAndReturnsItsResult()
 	{
 		const string source = """
 			public static class Counter

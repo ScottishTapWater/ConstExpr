@@ -6,7 +6,7 @@ namespace ConstExpr.Roslyn.Tests;
 public sealed class PipelineTests
 {
 	[Test]
-	public async Task GeneratesAnInterceptorForADirectCall()
+	public async Task GeneratesAnInterceptorForACallToAMarkedMethod()
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
 
@@ -16,7 +16,7 @@ public sealed class PipelineTests
 	}
 
 	[Test]
-	public async Task GeneratedInterceptorCompiles()
+	public async Task GeneratedInterceptorCanBeEmittedAsAnAssembly()
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
 		GeneratorRun run = GeneratorRun.Create(input);
@@ -29,7 +29,7 @@ public sealed class PipelineTests
 	}
 
 	[Test]
-	public async Task RepeatedDirectCallsReturnTheBakedValue()
+	public async Task RepeatedCallsToAMarkedMethodReturnItsBuildTimeResult()
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
@@ -40,7 +40,7 @@ public sealed class PipelineTests
 	}
 
 	[Test]
-	public async Task InterceptedCallsDoNotExecuteTheOriginalMethod()
+	public async Task InterceptedCallsDoNotExecuteTheOriginalMethodAtRuntime()
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
@@ -51,7 +51,7 @@ public sealed class PipelineTests
 	}
 
 	[Test]
-	public async Task UnmarkedMethodProducesNoGeneratedSource()
+	public async Task CallsToUnmarkedMethodsProduceNoGeneratedSource()
 	{
 		ConstExprGeneratorTest test = new();
 		test.TestState.Sources.Add(("Counter.cs", FixtureSources.Counter.Replace("[ConstExpr]", "", StringComparison.Ordinal)));

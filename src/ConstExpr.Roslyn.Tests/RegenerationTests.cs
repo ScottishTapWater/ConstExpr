@@ -7,7 +7,7 @@ namespace ConstExpr.Roslyn.Tests;
 public sealed class RegenerationTests
 {
 	[Test]
-	public async Task InsertingALineBeforeTheCallUpdatesItsLocation()
+	public async Task CallsRemainInterceptedAfterInsertingALineBeforeTheCallSite()
 	{
 		CSharpCompilation input = await Input();
 		GeneratorRun initial = GeneratorRun.Create(input);
@@ -22,7 +22,7 @@ public sealed class RegenerationTests
 	}
 
 	[Test]
-	public async Task EditingAfterTheCallUpdatesTheFileChecksum()
+	public async Task CallsRemainInterceptedAfterEditingTextAfterTheCallSite()
 	{
 		CSharpCompilation input = await Input();
 		GeneratorRun initial = GeneratorRun.Create(input);
@@ -37,7 +37,7 @@ public sealed class RegenerationTests
 	}
 
 	[Test]
-	public async Task MovingTheCallToAnotherFileStillInterceptsIt()
+	public async Task CallsRemainInterceptedAfterMovingTheirSourceFile()
 	{
 		CSharpCompilation input = await Input();
 		GeneratorRun initial = GeneratorRun.Create(input);
@@ -54,7 +54,7 @@ public sealed class RegenerationTests
 	}
 
 	[Test]
-	public async Task AddingASecondCallSiteInterceptsBothCalls()
+	public async Task NewAndExistingCallSitesAreInterceptedAfterRegeneration()
 	{
 		CSharpCompilation input = await Input();
 		GeneratorRun initial = GeneratorRun.Create(input);
@@ -69,7 +69,7 @@ public sealed class RegenerationTests
 	}
 
 	[Test]
-	public async Task RemovingTheCallSiteRemovesItsInterceptor()
+	public async Task RemovingACallSiteRemovesItsGeneratedInterceptor()
 	{
 		CSharpCompilation input = await Input();
 		GeneratorRun initial = GeneratorRun.Create(input);

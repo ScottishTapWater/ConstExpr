@@ -5,7 +5,7 @@ namespace ConstExpr.Core.Tests;
 public sealed class ResultSerializerTests
 {
 	[Test]
-	public async Task RoundTripPreservesOne()
+	public async Task SerialisationRoundTripPreservesTheIntegerResult()
 	{
 		ResultSerializer serializer = new();
 

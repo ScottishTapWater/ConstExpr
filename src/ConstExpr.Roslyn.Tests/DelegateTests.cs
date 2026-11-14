@@ -8,7 +8,7 @@ public sealed class DelegateTests
 	[Test]
 	[Arguments("stored lambda", "Func<int> next = () => Counter.CountUp();", "next()")]
 	[Arguments("lambda callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(() => Counter.CountUp())")]
-	public async Task LambdaDelegateUsesTheBakedResult(string name, string declarations, string expression)
+	public async Task CallsInsideLambdaDelegatesUsePrecomputedResults(string name, string declarations, string expression)
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller(expression, declarations)));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
@@ -22,7 +22,7 @@ public sealed class DelegateTests
 	[Test]
 	[Arguments("stored method group", "Func<int> next = Counter.CountUp;", "next()")]
 	[Arguments("method group callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(Counter.CountUp)")]
-	public async Task MethodGroupDelegateExecutesTheOriginalMethod(string name, string declarations, string expression)
+	public async Task MethodGroupDelegatesExecuteTheOriginalMethodOnEveryInvocation(string name, string declarations, string expression)
 	{
 		CSharpCompilation input = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller(expression, declarations)));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");

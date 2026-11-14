@@ -6,7 +6,7 @@ namespace ConstExpr.Roslyn.Tests;
 public sealed class InfrastructureTests
 {
 	[Test]
-	public async Task WithoutInterceptionTheCounterAdvances()
+	public async Task CallsWithoutInterceptionExecuteTheOriginalMethodEachTime()
 	{
 		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture fixture = new(compilation, "Fixture.Caller");
@@ -18,7 +18,7 @@ public sealed class InfrastructureTests
 	}
 
 	[Test]
-	public async Task ManualInterceptorReplacesTheCall()
+	public async Task ManualInterceptionReturnsTheReplacementResultWithoutExecutingTheOriginalMethod()
 	{
 		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture fixture = new(ManualInterceptor.Add(compilation), "Fixture.Caller");
@@ -30,7 +30,7 @@ public sealed class InfrastructureTests
 	}
 
 	[Test]
-	public async Task LoadingTheSameCompilationAgainStartsWithFreshState()
+	public async Task SeparateAssemblyLoadsDoNotShareStaticState()
 	{
 		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture first = new(compilation, "Fixture.Caller");

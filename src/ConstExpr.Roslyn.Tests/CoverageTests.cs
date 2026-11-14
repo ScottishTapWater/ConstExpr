@@ -6,7 +6,7 @@ namespace ConstExpr.Roslyn.Tests;
 public sealed class CoverageTests
 {
 	[Test]
-	public async Task BothCallSitesInOneMethodAreIntercepted()
+	public async Task EveryCallSiteInTheSameMethodUsesAPrecomputedResult()
 	{
 		string source = FixtureSources.Simple.Replace("CountUp();", "CountUp() + CountUp();", StringComparison.Ordinal);
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", source));
@@ -19,7 +19,7 @@ public sealed class CoverageTests
 	}
 
 	[Test]
-	public async Task CallSitesInTwoFilesAreBothIntercepted()
+	public async Task CallSitesInDifferentSourceFilesUsePrecomputedResults()
 	{
 		const string first = "namespace Fixture; public static class First { public static int Next() => Counter.CountUp(); }";
 		const string second = "namespace Fixture; public static class Second { public static int Next() => Counter.CountUp(); }";
@@ -35,7 +35,7 @@ public sealed class CoverageTests
 	}
 
 	[Test]
-	public async Task TwoMarkedMethodsAreInterceptedIndependently()
+	public async Task CallsToDifferentMarkedMethodsUseTheirOwnPrecomputedResults()
 	{
 		string other = FixtureSources.Counter.Replace("class Counter", "class OtherCounter", StringComparison.Ordinal);
 		CSharpCompilation input = await CompilationFixture.Create(
@@ -51,7 +51,7 @@ public sealed class CoverageTests
 	}
 
 	[Test]
-	public async Task UnmarkedMethodStillExecutesNormally()
+	public async Task CallsToUnmarkedMethodsExecuteTheOriginalMethodAtRuntime()
 	{
 		string source = FixtureSources.Simple.Replace("[ConstExpr]", "", StringComparison.Ordinal);
 		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", source));

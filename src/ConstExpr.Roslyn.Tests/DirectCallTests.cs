@@ -14,7 +14,7 @@ public sealed class DirectCallTests
 	[Arguments(DirectCallForm.UsingStatic)]
 	[Arguments(DirectCallForm.OtherClassSameFile)]
 	[Arguments(DirectCallForm.OtherSourceFile)]
-	public async Task DirectCallUsesTheBakedResult(DirectCallForm form)
+	public async Task DirectCallsToMarkedMethodsReturnPrecomputedResults(DirectCallForm form)
 	{
 		(string Path, string Source)[] sources = Sources(form);
 		CSharpCompilation input = await CompilationFixture.Create(sources);
