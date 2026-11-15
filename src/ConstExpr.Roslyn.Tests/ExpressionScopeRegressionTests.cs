@@ -97,6 +97,32 @@ public sealed class ExpressionScopeRegressionTests
 		await test.RunAsync();
 	}
 
+	[Test]
+	public async Task BuildTimeEvaluationDoesNotExecuteTheContainingCaller()
+	{
+		const string source = """
+			using ConstExpr;
+			public static class Counter
+			{
+				private static int Create() => 42;
+				private static void Fail() => throw new System.Exception("The caller must not execute.");
+				[ConstExpr] public static int Calculate(int input) => input;
+				public static int Caller()
+				{
+					Fail();
+					return Calculate(Create());
+				}
+			}
+			""";
+		CSharpCompilation compilation = await CompilationFixture.CreateWithOptions([new("Program.cs", source)],
+			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release,
+				generalDiagnosticOption: ReportDiagnostic.Error, specificDiagnosticOptions: new Dictionary<string, ReportDiagnostic> { ["CONSTEXPR004"] = ReportDiagnostic.Warn }));
+
+		GeneratorRun run = GeneratorRun.Create(compilation);
+
+		await Assert.That(run.HasInterceptor).IsTrue();
+	}
+
 	public static IEnumerable<Func<CallerInformationTestCase>> CallerInformationExpressions() =>
 	[
 		() => new("Indexer member name", "public class Input { public string this[int value, [CallerMemberName] string caller = \"\"] => caller; }", "new Input()[0]", "Run"),
@@ -104,6 +130,29 @@ public sealed class ExpressionScopeRegressionTests
 		() => new("Conditional indexer member name", "public class Input { public string this[int value, [CallerMemberName] string caller = \"\"] => caller; }", "new Input()?[0]", "Run"),
 		() => new("Conditional indexer line number", "public class Input { public string this[int value, [CallerLineNumber] int line = 0] => line.ToString(); }", "new Input()?[0]", "123"),
 		() => new("Conditional indexer null receiver", "public class Input { public string this[int value, [CallerMemberName] string caller = \"\"] => caller; }", "((Input)null)?[0] ?? \"missing\"", "missing"),
+		() => new("Indexer initialiser", "public class Input { public string Caller; public int this[int index, [CallerMemberName] string caller = \"\"] { set => Caller = caller; } }", "new Input { [0] = 1 }.Caller", "Run"),
+		() => new("More specific method overload", """
+			public static class Input
+			{
+				public static string Create(object value, [CallerMemberName] string caller = "") => "correct:" + caller;
+				public static string Create(string value, string caller) => "wrong:" + caller;
+			}
+			""", "Input.Create(\"value\")", "correct:Run"),
+		() => new("More specific collection overload", """
+			public class Input : List<string>
+			{
+				public void Add(object value, [CallerMemberName] string caller = "") => base.Add("correct:" + caller);
+				public void Add(int value, string caller) => base.Add("wrong:" + caller);
+			}
+			""", "new Input { 1 }[0]", "correct:Run"),
+		() => new("Generic call with implicit conversion", """
+			public class Input
+			{
+				public static implicit operator string(Input value) => "implicit";
+				public static explicit operator int(Input value) => 42;
+			}
+			public static class Helper { public static T Identity<T>(T value) => value; }
+			""", "Helper.Identity<string>(new Input())", "implicit"),
 		() => new("Collection overload with params", """
 			public class Input : List<string>
 			{

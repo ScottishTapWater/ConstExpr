@@ -18,7 +18,9 @@ Shared references and cycles in STJ-supported object graphs are preserved using 
 
 Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
 
-Evaluation currently compiles and loads the original compilation inside the compiler process. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Isolated execution is outside the current implementation.
+Expression evaluation adds uniquely marked static local functions in the original lexical scope of a build-only compilation. The original invocation and argument text remain unchanged, leaving overload resolution, conversions, constants and caller information to the compiler. The extraction function is invoked directly. Initialisers and expression-bodied lambdas use a build-only block wrapper where needed to retain that scope. Extraction functions must be closed and parameterless; unresolved generic extraction contexts report an evaluation error.
+
+Evaluation compiles and loads this temporary compilation inside the compiler process. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Evaluation helpers do not ship in the application. Isolated execution is outside the current implementation.
 
 ## Structure
 
