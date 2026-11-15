@@ -6,6 +6,6 @@ internal sealed class MethodEvaluator
 {
 	public object? Evaluate(MethodInfo method)
 	{
-		throw new NotImplementedException();
+		return method.Invoke(null, null);
 	}
 }

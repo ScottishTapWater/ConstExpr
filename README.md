@@ -2,15 +2,17 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The generator entry point is empty. `[ConstExpr]` is available, and Core evaluation and serialisation entry points throw `NotImplementedException`. The active test suite describes the intended behaviour and is deliberately red until implementation.
+The first implementation evaluates parameterless static `[ConstExpr]` methods returning `int` during compilation and generates interceptors that return their precomputed values. Direct calls are intercepted; method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
+
+Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. General result types and isolated execution are outside this initial slice.
 
 ## Structure
 
 | Project | Responsibility |
 | --- | --- |
 | `ConstExpr` | The method-only `[ConstExpr]` attribute and application-facing contracts. |
-| `ConstExpr.Core` | Roslyn-independent evaluation and serialisation stubs. |
-| `ConstExpr.Roslyn` | Compiler integration and the empty generator entry point in `ConstExpr.Roslyn.Generators`. |
+| `ConstExpr.Core` | Roslyn-independent method evaluation and integer serialisation. |
+| `ConstExpr.Roslyn` | Compiler integration and interceptor generation in `ConstExpr.Roslyn.Generators`. |
 | `ConstExpr.Core.Tests` | TUnit tests for evaluation and serialisation. |
 | `ConstExpr.Roslyn.Tests` | Compiler controls, pipeline tests, call-site theories, and source-edit tests. |
 
