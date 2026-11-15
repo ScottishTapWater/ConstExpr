@@ -1,10 +1,31 @@
 using ConstExpr.Roslyn.Tests.Infrastructure;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 
 namespace ConstExpr.Roslyn.Tests;
 
 public sealed class PipelineTests
 {
+	[Test]
+	public async Task EvaluationFailureReportsABuildErrorAtTheCallSite()
+	{
+		ConstExprGeneratorTest test = new();
+		test.TestState.Sources.Add(("Program.cs", """
+			using ConstExpr;
+			public static class Counter
+			{
+				[ConstExpr]
+				public static int CountUp() => throw new System.InvalidOperationException("Evaluation failed.");
+				public static int Run() => {|#0:CountUp()|};
+			}
+			"""));
+		test.ExpectedDiagnostics.Add(new DiagnosticResult("CONSTEXPR001", DiagnosticSeverity.Error)
+			.WithLocation(0).WithArguments("Evaluation failed."));
+
+		await test.RunAsync();
+	}
+
 	[Test]
 	public async Task GeneratesAnInterceptorForACallToAMarkedMethod()
 	{
