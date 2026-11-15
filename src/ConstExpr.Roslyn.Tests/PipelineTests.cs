@@ -31,23 +31,19 @@ public sealed class PipelineTests
 	[Test]
 	public async Task RepeatedCallsToAMarkedMethodReturnItsBuildTimeResult()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Program.cs", FixtureSources.Simple)], "Fixture.Counter.Run");
 
-		int[] values = await fixture.Run();
-
-		await Assert.That(values).IsEquivalentTo(new[] { 1, 1, 1 });
+		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
 	}
 
 	[Test]
 	public async Task InterceptedCallsDoNotExecuteTheOriginalMethodAtRuntime()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Program.cs", FixtureSources.Simple)], "Fixture.Counter.Run");
 
-		await fixture.Run();
-
-		await Assert.That(fixture.Calls).IsEqualTo(0);
+		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
 	}
 
 	[Test]

@@ -1,5 +1,4 @@
 using ConstExpr.Roslyn.Tests.Infrastructure;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace ConstExpr.Roslyn.Tests;
 
@@ -10,13 +9,11 @@ public sealed class DelegateTests
 	[Arguments("lambda callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(() => Counter.CountUp())")]
 	public async Task CallsInsideLambdaDelegatesUsePrecomputedResults(string name, string declarations, string expression)
 	{
-		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations)));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations))], "Fixture.Caller.Run");
 
-		int[] values = await fixture.Run();
-
-		await Assert.That(values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(fixture.Calls).IsEqualTo(0);
+		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
 	}
 
 	[Test]
@@ -24,12 +21,10 @@ public sealed class DelegateTests
 	[Arguments("method group callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(Counter.CountUp)")]
 	public async Task MethodGroupDelegatesExecuteTheOriginalMethodOnEveryInvocation(string name, string declarations, string expression)
 	{
-		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations)));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations))], "Fixture.Caller.Run");
 
-		int[] values = await fixture.Run();
-
-		await Assert.That(values).IsEquivalentTo(new[] { 1, 2, 3 });
-		await Assert.That(fixture.Calls).IsEqualTo(3);
+		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
+		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
 	}
 }

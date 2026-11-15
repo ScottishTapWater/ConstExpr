@@ -4,6 +4,7 @@ internal static class FixtureSources
 {
 	internal const string Simple = """
 		using ConstExpr;
+		using ConstExpr.Roslyn.Tests.Infrastructure;
 
 		namespace Fixture;
 
@@ -15,14 +16,14 @@ internal static class FixtureSources
 			[ConstExpr]
 			public static int CountUp() => ++counter;
 
-			public static int[] Run()
+			public static ExecutionResult Run()
 			{
 				int[] values = new int[3];
 				for (int index = 0; index < values.Length; index++)
 				{
 					values[index] = CountUp();
 				}
-				return values;
+				return new ExecutionResult(values, Calls);
 			}
 		}
 		""";
@@ -46,13 +47,14 @@ internal static class FixtureSources
 		using System;
 		using System.Collections.Generic;
 		using System.Threading.Tasks;
+		using ConstExpr.Roslyn.Tests.Infrastructure;
 		{{imports}}
 
 		namespace Fixture;
 
 		public static class Caller
 		{
-			public static int[] Run()
+			public static ExecutionResult Run()
 			{
 				{{declarations}}
 				int[] values = new int[3];
@@ -60,7 +62,7 @@ internal static class FixtureSources
 				{
 					values[index] = {{expression}};
 				}
-				return values;
+				return new ExecutionResult(values, Counter.Calls);
 			}
 		}
 		""";

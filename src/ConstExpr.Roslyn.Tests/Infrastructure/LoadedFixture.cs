@@ -8,11 +8,9 @@ internal sealed class LoadedFixture : IDisposable
 {
 	private readonly AssemblyLoadContext _context;
 	private readonly Assembly _assembly;
-	private readonly string _entryType;
 
-	internal LoadedFixture(Compilation compilation, string entryType = "Fixture.Counter")
+	internal LoadedFixture(Compilation compilation)
 	{
-		_entryType = entryType;
 		using MemoryStream stream = new();
 		Microsoft.CodeAnalysis.Emit.EmitResult emitted = compilation.Emit(stream);
 		CompilationFixture.ThrowOnErrors(emitted.Diagnostics);
@@ -21,14 +19,16 @@ internal sealed class LoadedFixture : IDisposable
 		_assembly = _context.LoadFromStream(stream);
 	}
 
-	internal int Calls => CallsFor("Fixture.Counter");
-
-	internal int CallsFor(string typeName) => (int)_assembly.GetType(typeName, throwOnError: true)!.GetProperty("Calls")!.GetValue(null)!;
-
-	internal async Task<int[]> Run()
+	internal async Task<TResult> Run<TResult>(string entrypoint)
 	{
-		object result = _assembly.GetType(_entryType, throwOnError: true)!.GetMethod("Run")!.Invoke(null, null)!;
-		return result is Task<int[]> task ? await task : (int[])result;
+		int separator = entrypoint.LastIndexOf('.');
+		string typeName = entrypoint[..separator];
+		string methodName = entrypoint[(separator + 1)..];
+		Type type = _assembly.GetType(typeName, throwOnError: true)!;
+		MethodInfo method = type.GetMethod(methodName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, Type.EmptyTypes)
+			?? throw new MissingMethodException(typeName, methodName);
+		object result = method.Invoke(null, null)!;
+		return result is Task<TResult> task ? await task : (TResult)result;
 	}
 
 	public void Dispose()

@@ -11,6 +11,7 @@ internal sealed class ConstExprGeneratorTest : CSharpSourceGeneratorTest<ConstEx
 	{
 		ReferenceAssemblies = CompilationFixture.Framework;
 		TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ConstExprAttribute).Assembly.Location));
+		TestState.AdditionalReferences.Add(MetadataReference.CreateFromFile(typeof(ExecutionResult).Assembly.Location));
 	}
 
 	protected override ParseOptions CreateParseOptions() => CompilationFixture.ParseOptions;

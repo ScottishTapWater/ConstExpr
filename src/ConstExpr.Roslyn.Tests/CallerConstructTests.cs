@@ -1,5 +1,4 @@
 using ConstExpr.Roslyn.Tests.Infrastructure;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace ConstExpr.Roslyn.Tests;
 
@@ -10,13 +9,11 @@ public sealed class CallerConstructTests
 	public async Task CallsInsideCallerConstructsReturnPrecomputedResults(CallerConstructCase testCase)
 	{
 		string caller = FixtureSources.Caller(testCase.Expression, testCase.Declaration);
-		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller)], "Fixture.Caller.Run");
 
-		int[] values = await fixture.Run();
-
-		await Assert.That(values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(fixture.Calls).IsEqualTo(0);
+		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
 	}
 
 	[Test]
@@ -24,12 +21,13 @@ public sealed class CallerConstructTests
 	{
 		const string caller = """
 			using System.Threading.Tasks;
+			using ConstExpr.Roslyn.Tests.Infrastructure;
 
 			namespace Fixture;
 
 			public static class Caller
 			{
-				public static async Task<int[]> Run()
+				public static async Task<ExecutionResult> Run()
 				{
 					static async Task<int> Next()
 					{
@@ -42,17 +40,15 @@ public sealed class CallerConstructTests
 					{
 						values[index] = await Next();
 					}
-					return values;
+					return new ExecutionResult(values, Counter.Calls);
 				}
 			}
 			""";
-		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller));
-		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
+		ExecutionResult result = await ConstExprFixture.CompileAndRun(
+			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller)], "Fixture.Caller.Run");
 
-		int[] values = await fixture.Run();
-
-		await Assert.That(values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(fixture.Calls).IsEqualTo(0);
+		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
 	}
 
 	public static IEnumerable<Func<CallerConstructCase>> SynchronousCallers()

@@ -21,7 +21,8 @@ internal static class CompilationFixture
 		CSharpCompilation compilation = CSharpCompilation.Create(
 			$"Fixture_{Guid.NewGuid():N}",
 			sources.Select(source => CSharpSyntaxTree.ParseText(source.Text, ParseOptions, source.Path)),
-			references.Add(MetadataReference.CreateFromFile(typeof(ConstExprAttribute).Assembly.Location)),
+			references.Add(MetadataReference.CreateFromFile(typeof(ConstExprAttribute).Assembly.Location))
+				.Add(MetadataReference.CreateFromFile(typeof(ExecutionResult).Assembly.Location)),
 			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 		ThrowOnErrors(compilation.GetDiagnostics());
 		return compilation;
