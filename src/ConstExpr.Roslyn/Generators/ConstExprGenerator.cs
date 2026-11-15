@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Emit;
+using Microsoft.CodeAnalysis.Operations;
 
 namespace ConstExpr.Roslyn.Generators;
 
@@ -35,7 +36,7 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 	private static void Generate(SourceProductionContext context, CSharpCompilation compilation, ImmutableArray<InvocationExpressionSyntax> calls)
 	{
 		Assembly? assembly = null;
-		Dictionary<IMethodSymbol, string> results = new(SymbolEqualityComparer.Default);
+		Dictionary<IMethodSymbol, Dictionary<int, string>> results = new(SymbolEqualityComparer.Default);
 		MethodEvaluator evaluator = new();
 		ResultSerializer serializer = new();
 		StringBuilder interceptors = new();
@@ -44,8 +45,13 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 		{
 			context.CancellationToken.ThrowIfCancellationRequested();
 			SemanticModel model = compilation.GetSemanticModel(call.SyntaxTree);
-			if (model.GetSymbolInfo(call, context.CancellationToken).Symbol is not IMethodSymbol method
-				|| !IsSupported(method) || model.GetInterceptorMethod(call) is not null)
+			if (model.GetOperation(call, context.CancellationToken) is not IInvocationOperation invocation
+				|| !IsSupported(invocation.TargetMethod) || model.GetInterceptorMethod(call) is not null)
+			{
+				continue;
+			}
+			IMethodSymbol method = invocation.TargetMethod;
+			if (!TryGetConstantArgument(invocation, out int? argument))
 			{
 				continue;
 			}
@@ -56,17 +62,25 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 			}
 			try
 			{
-				if (!results.TryGetValue(method, out string? literal))
+				if (!results.TryGetValue(method, out Dictionary<int, string>? methodResults))
+				{
+					methodResults = new();
+					results.Add(method, methodResults);
+				}
+				if (!methodResults.TryGetValue(argument.GetValueOrDefault(), out string? literal))
 				{
 					assembly ??= CompileForEvaluation(compilation, context.CancellationToken);
 					Type type = assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
+					Type[] parameterTypes = argument.HasValue ? [typeof(int)] : Type.EmptyTypes;
 					MethodInfo entrypoint = type.GetMethod(method.MetadataName,
-						BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, Type.EmptyTypes, null)!;
-					literal = serializer.Serialize(evaluator.Evaluate(entrypoint), typeof(int));
-					results.Add(method, literal);
+						BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameterTypes, null)!;
+					object?[] arguments = argument.HasValue ? [argument.Value] : [];
+					literal = serializer.Serialize(evaluator.Evaluate(entrypoint, arguments), typeof(int));
+					methodResults.Add(argument.GetValueOrDefault(), literal);
 				}
 				interceptors.AppendLine($"[System.Runtime.CompilerServices.InterceptsLocation({location.Version}, \"{location.Data}\")]");
-				interceptors.AppendLine($"public static int Invoke{index++}() => {literal};");
+				string parameters = argument.HasValue ? "int value" : "";
+				interceptors.AppendLine($"public static int Invoke{index++}({parameters}) => {literal};");
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -99,9 +113,25 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 	private static bool IsSupported(IMethodSymbol method)
 	{
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
-			&& method.Parameters.Length == 0 && !method.IsGenericMethod && !method.ContainingType.IsGenericType
+			&& method.Parameters.Length <= 1 && !method.IsGenericMethod && !method.ContainingType.IsGenericType
+			&& method.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)
 			&& !method.ReturnsByRef && !method.ReturnsByRefReadonly && method.ReturnType.SpecialType == SpecialType.System_Int32
 			&& method.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "ConstExpr.ConstExprAttribute");
+	}
+
+	private static bool TryGetConstantArgument(IInvocationOperation invocation, out int? argument)
+	{
+		argument = null;
+		if (invocation.Arguments.Length == 0)
+		{
+			return true;
+		}
+		if (invocation.Arguments[0].Value.ConstantValue is { HasValue: true, Value: int value })
+		{
+			argument = value;
+			return true;
+		}
+		return false;
 	}
 
 	private static string GetMetadataName(INamedTypeSymbol type)
