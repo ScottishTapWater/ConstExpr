@@ -54,7 +54,7 @@ internal sealed class CallSiteProcessor
 			}
 			bool constantArguments = TryGetConstantArguments(invocation, out object?[] arguments);
 			bool scalarArguments = constantArguments && method.Parameters.All(parameter => IsConstantType(parameter.Type));
-			if (!ArgumentExpressionAnalysis.CanEvaluate(invocation)
+			if (!ArgumentExpressionAnalysis.CanEvaluate(invocation, model, context.CancellationToken)
 				|| !scalarArguments && call.Ancestors().OfType<TypeDeclarationSyntax>().Any(type => model.GetDeclaredSymbol(type)?.IsGenericType == true))
 			{
 				context.ReportDiagnostic(Diagnostic.Create(_callerRuntimeState, call.GetLocation(), method.ToDisplayString()));

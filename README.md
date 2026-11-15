@@ -18,7 +18,7 @@ Shared references and cycles in STJ-supported object graphs are preserved using 
 
 Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
 
-Expression evaluation adds uniquely marked static local functions in the original lexical scope of a build-only compilation. The original invocation and argument text remain unchanged, leaving overload resolution, conversions, constants and caller information to the compiler. The extraction function is invoked directly. Initialisers and expression-bodied lambdas use a build-only block wrapper where needed to retain that scope. Extraction functions must be closed and parameterless; unresolved generic extraction contexts report an evaluation error.
+Expression evaluation adds uniquely marked static local functions to a build-only compilation. Nongeneric callers retain their lexical scope. Independent expressions in generic callers use a separate nongeneric scope without guessing type arguments. Extraction preserves the original expression text and source context. Before execution, it verifies selected members, conversions, typed constants and compiler-supplied arguments against the original compiler binding. A binding mismatch reports `CONSTEXPR001`.
 
 Evaluation compiles and loads this temporary compilation inside the compiler process. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Evaluation helpers do not ship in the application. Isolated execution is outside the current implementation.
 
