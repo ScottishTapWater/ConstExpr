@@ -4,6 +4,7 @@ using ConstExpr.Core.Evaluation;
 using ConstExpr.Core.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Emit;
 
 namespace ConstExpr.Roslyn.Evaluation;
@@ -14,16 +15,26 @@ internal sealed class CompilationEvaluator
 	private readonly MethodEvaluator _evaluator;
 	private readonly ResultSerializer _serializer;
 	private readonly EvaluationAssemblyLoader _loader;
+	private readonly CallExpressionCompiler _expressions;
 	private readonly Dictionary<IMethodSymbol, Dictionary<ArgumentCacheKey, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
 	private int _nextResultId;
 
-	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer, EvaluationAssemblyLoader loader)
+	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer, EvaluationAssemblyLoader loader, CallExpressionCompiler expressions)
 	{
 		_compilation = compilation;
 		_evaluator = evaluator;
 		_serializer = serializer;
 		_loader = loader;
+		_expressions = expressions;
+	}
+
+	internal EvaluatedResult EvaluateExpression(InvocationExpressionSyntax call, SemanticModel model, ITypeSymbol returnType, CancellationToken cancellationToken)
+	{
+		MethodInfo entrypoint = _expressions.Compile(call, model, returnType, cancellationToken);
+		object? value = _evaluator.Evaluate(entrypoint, []);
+		string json = _serializer.Serialize(value, entrypoint.ReturnType);
+		return new(_nextResultId++, json);
 	}
 
 	internal EvaluatedResult Evaluate(IMethodSymbol method, object?[] arguments, CancellationToken cancellationToken)

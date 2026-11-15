@@ -12,9 +12,13 @@ internal sealed class CallSiteProcessor
 #pragma warning disable RS2008 // Diagnostic release tracking is not configured.
 	private static readonly DiagnosticDescriptor _evaluationFailed = new(
 		"CONSTEXPR001", "Compile-time evaluation failed", "{0}", "ConstExpr", DiagnosticSeverity.Error, true);
-	private static readonly DiagnosticDescriptor _nonconstantArgument = new(
-		"CONSTEXPR002", "Argument is not a compile-time constant",
-		"Call to '{0}' will run at runtime because at least one argument is not a compile-time constant",
+	private static readonly DiagnosticDescriptor _callerRuntimeState = new(
+		"CONSTEXPR002", "Argument requires caller runtime state",
+		"Call to '{0}' will run at runtime because at least one argument requires caller runtime state",
+		"ConstExpr", DiagnosticSeverity.Warning, true);
+	private static readonly DiagnosticDescriptor _runtimeArgumentEvaluation = new(
+		"CONSTEXPR004", "Argument expressions still execute at runtime",
+		"Call to '{0}' uses a precomputed result; argument expressions still execute at runtime but their values are ignored. Move argument construction inside the [ConstExpr] method to avoid this runtime work.",
 		"ConstExpr", DiagnosticSeverity.Warning, true);
 #pragma warning restore RS2008
 
@@ -39,9 +43,12 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
-			if (!TryGetConstantArguments(invocation, out object?[] arguments))
+			bool constantArguments = TryGetConstantArguments(invocation, out object?[] arguments);
+			bool scalarArguments = constantArguments && method.Parameters.All(parameter => IsConstantType(parameter.Type));
+			if (!ArgumentExpressionAnalysis.CanEvaluate(invocation)
+				|| !scalarArguments && call.Ancestors().OfType<TypeDeclarationSyntax>().Any(type => model.GetDeclaredSymbol(type)?.IsGenericType == true))
 			{
-				context.ReportDiagnostic(Diagnostic.Create(_nonconstantArgument, call.GetLocation(), method.ToDisplayString()));
+				context.ReportDiagnostic(Diagnostic.Create(_callerRuntimeState, call.GetLocation(), method.ToDisplayString()));
 				continue;
 			}
 			InterceptableLocation? location = model.GetInterceptableLocation(call, context.CancellationToken);
@@ -51,8 +58,14 @@ internal sealed class CallSiteProcessor
 			}
 			try
 			{
-				EvaluatedResult result = _evaluator.Evaluate(method, arguments, context.CancellationToken);
+				EvaluatedResult result = scalarArguments
+					? _evaluator.Evaluate(method, arguments, context.CancellationToken)
+					: _evaluator.EvaluateExpression(call, model, method.ReturnType, context.CancellationToken);
 				_source.Add(location, method, result);
+				if (!constantArguments)
+				{
+					context.ReportDiagnostic(Diagnostic.Create(_runtimeArgumentEvaluation, call.GetLocation(), method.ToDisplayString()));
+				}
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -70,7 +83,8 @@ internal sealed class CallSiteProcessor
 	{
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
 			&& !method.IsGenericMethod && !method.ContainingType.IsGenericType
-			&& method.Parameters.All(parameter => IsConstantType(parameter.Type) && parameter.RefKind == RefKind.None)
+			&& method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.Type.IsRefLikeType
+				&& parameter.Type.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer))
 			&& !method.ReturnsVoid && !method.ReturnsByRef && !method.ReturnsByRefReadonly
 			&& !method.ReturnType.IsRefLikeType && method.ReturnType.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer)
 			&& method.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "ConstExpr.ConstExprAttribute");

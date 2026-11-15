@@ -2,11 +2,17 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json and are deserialised once into a shared static field per method and argument combination. Collections, ordinary DTOs, and null results are supported. Parameters support C# constant types: strings, characters, booleans, numeric primitives, decimals, and enums. Calls with constant arguments are intercepted; calls with any nonconstant argument report warning `CONSTEXPR002` and run normally at runtime. Consumers must enable interception for the `ConstExpr.Generated` namespace.
+The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json. Collections, ordinary DTOs, and null results are supported. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
-Compiled and interpreted expression-tree calls are intercepted with the supported compiler. Method-group delegates, dynamically bound calls to marked methods, reflection invocations and managed function pointers execute the original method.
+Arguments can be C# expressions, including constructors, collection expressions, static factories, fields, properties and lambdas. Input objects do not need to be serialisable. Expressions execute against the build environment; ConstExpr does not prove purity or determinism. Arguments requiring caller runtime locals, parameters, an instance or unresolved generic types report warning `CONSTEXPR002` and leave the call running normally at runtime. Following local assignments is not supported.
 
-Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`. Each method and argument combination has its own shared graph.
+Successfully precomputed calls with nonconstant arguments report warning `CONSTEXPR004`: argument expressions still execute at runtime, but their values are ignored, even if those values change. Move argument construction inside the `[ConstExpr]` method to avoid that runtime work.
+
+Constant scalar arguments share one reconstructed result per method and argument combination. Other calls share one reconstructed result per call site. ConstExpr does not compare arbitrary input object graphs to merge results between call sites.
+
+Compiled and interpreted expression-tree calls are intercepted with the supported compiler. Method-group delegates, dynamically bound calls to marked methods, reflection invocations and managed function pointers execute the original method. Method-group conversions and taking a method's address report warning `CONSTEXPR003`.
+
+Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`.
 
 Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
 

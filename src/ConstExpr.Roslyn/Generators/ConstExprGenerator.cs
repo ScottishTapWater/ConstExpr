@@ -26,7 +26,7 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 				CSharpCompilation compilation = (CSharpCompilation)input.Left.Left;
 				input.Right.GlobalOptions.TryGetValue("build_property.ConstExprRuntimeAssemblies", out string? paths);
 				using EvaluationAssemblyLoader loader = new(compilation, paths?.Split(['|'], StringSplitOptions.RemoveEmptyEntries) ?? []);
-				CompilationEvaluator evaluator = new(compilation, new MethodEvaluator(), new ResultSerializer(), loader);
+				CompilationEvaluator evaluator = new(compilation, new MethodEvaluator(), new ResultSerializer(), loader, new CallExpressionCompiler(loader));
 				CallSiteProcessor processor = new(evaluator, new InterceptorSourceBuilder());
 				processor.Process(output, compilation, input.Left.Right);
 			});
