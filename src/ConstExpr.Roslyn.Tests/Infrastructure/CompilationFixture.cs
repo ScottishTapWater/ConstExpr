@@ -15,7 +15,10 @@ internal static class CompilationFixture
 
 	private static readonly Task<ImmutableArray<MetadataReference>> _references = Framework.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
 
-	internal static async Task<CSharpCompilation> Create(params SourceFile[] sources)
+	internal static Task<CSharpCompilation> Create(params SourceFile[] sources) =>
+		CreateWithOptions(sources, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+	internal static async Task<CSharpCompilation> CreateWithOptions(SourceFile[] sources, CSharpCompilationOptions options)
 	{
 		ImmutableArray<MetadataReference> references = await _references;
 		CSharpCompilation compilation = CSharpCompilation.Create(
@@ -23,7 +26,7 @@ internal static class CompilationFixture
 			sources.Select(source => CSharpSyntaxTree.ParseText(source.Text, ParseOptions, source.Path)),
 			references.Add(MetadataReference.CreateFromFile(typeof(ConstExprAttribute).Assembly.Location))
 				.Add(MetadataReference.CreateFromFile(typeof(ExecutionResult).Assembly.Location)),
-			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+			options);
 		ThrowOnErrors(compilation.GetDiagnostics());
 		return compilation;
 	}

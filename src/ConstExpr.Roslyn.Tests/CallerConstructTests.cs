@@ -65,6 +65,10 @@ public sealed class CallerConstructTests
 		yield return () => new("static local function", "static int Next() => Counter.CountUp();", "Next()");
 		yield return () => new("generic caller", "static int Next<T>() => Counter.CountUp();", "Next<string>()");
 		yield return () => new("iterator", "static IEnumerable<int> Next() { yield return Counter.CountUp(); }", "System.Linq.Enumerable.Single(Next())");
+		yield return () => new("compiled expression tree",
+			"System.Linq.Expressions.Expression<Func<int>> tree = () => Counter.CountUp(); Func<int> next = tree.Compile();", "next()");
+		yield return () => new("interpreted expression tree",
+			"System.Linq.Expressions.Expression<Func<int>> tree = () => Counter.CountUp(); Func<int> next = tree.Compile(preferInterpretation: true);", "next()");
 	}
 
 	public sealed record CallerConstructCase(string Name, string Declaration, string Expression)
