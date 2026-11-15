@@ -11,14 +11,14 @@ Evaluation currently compiles and loads the original compilation inside the comp
 | Project | Responsibility |
 | --- | --- |
 | `ConstExpr` | The method-only `[ConstExpr]` attribute and application-facing contracts. |
-| `ConstExpr.Core` | Roslyn-independent method evaluation and integer serialisation. |
+| `ConstExpr.Core` | Roslyn-independent method evaluation and serialisation using System.Text.Json. |
 | `ConstExpr.Roslyn` | Compiler integration and interceptor generation in `ConstExpr.Roslyn.Generators`. |
 | `ConstExpr.Core.Tests` | TUnit tests for evaluation and serialisation. |
 | `ConstExpr.Roslyn.Tests` | Compiler controls, pipeline tests, call-site theories, and source-edit tests. |
 
 Roslyn references Core and contracts. Core references contracts. ArchonAnalysers enforces this direction and forbids `Microsoft.CodeAnalysis*` assembly references from Core and contracts. It is a private development dependency in every project and is excluded from the consumer package.
 
-The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. Core and Roslyn are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
+The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. System.Text.Json and its transitive dependencies are bundled beside the generator. Core, Roslyn, and the bundled dependencies are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
 
 The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK.
 
@@ -32,7 +32,7 @@ dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/p
 bash .github/scripts/check-package.sh 0.1.0
 ```
 
-The package check validates the NuGet layout and builds a consumer that loads the packaged generator.
+The package check validates the NuGet layout and builds and runs a consumer that exercises evaluation, serialisation, and interception using the packaged generator.
 
 ## Tests
 

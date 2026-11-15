@@ -13,6 +13,15 @@ cat > "$consumer_dir/expected-assemblies.txt" <<'EOF'
 analyzers/dotnet/cs/ConstExpr.Core.dll
 analyzers/dotnet/cs/ConstExpr.Roslyn.dll
 analyzers/dotnet/cs/ConstExpr.dll
+analyzers/dotnet/cs/Microsoft.Bcl.AsyncInterfaces.dll
+analyzers/dotnet/cs/System.Buffers.dll
+analyzers/dotnet/cs/System.IO.Pipelines.dll
+analyzers/dotnet/cs/System.Memory.dll
+analyzers/dotnet/cs/System.Numerics.Vectors.dll
+analyzers/dotnet/cs/System.Runtime.CompilerServices.Unsafe.dll
+analyzers/dotnet/cs/System.Text.Encodings.Web.dll
+analyzers/dotnet/cs/System.Text.Json.dll
+analyzers/dotnet/cs/System.Threading.Tasks.Extensions.dll
 lib/netstandard2.0/ConstExpr.dll
 EOF
 grep '\.dll$' "$consumer_dir/contents.txt" | sort > "$consumer_dir/actual-assemblies.txt"
@@ -33,6 +42,8 @@ cat > "$consumer_dir/application/Consumer.csproj" <<EOF
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <InterceptorsNamespaces>ConstExpr.Generated</InterceptorsNamespaces>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
@@ -41,17 +52,42 @@ cat > "$consumer_dir/application/Consumer.csproj" <<EOF
 </Project>
 EOF
 cat > "$consumer_dir/application/Example.cs" <<'EOF'
+using ConstExpr;
+
 namespace Consumer;
 
-public sealed class Example;
+public static class Program
+{
+  private static int counter;
+
+  [ConstExpr]
+  public static int CountUp() => ++counter;
+
+  public static void Main()
+  {
+    for (int index = 0; index < 3; index++)
+    {
+      if (CountUp() != 1)
+      {
+        throw new System.InvalidOperationException("The packaged generator returned the wrong result.");
+      }
+    }
+    if (counter != 0)
+    {
+      throw new System.InvalidOperationException("The original method executed at runtime.");
+    }
+    System.Console.WriteLine("Packaged generator precomputed the result; runtime counter stayed zero.");
+  }
+}
 EOF
 dotnet restore "$consumer_dir/application/Consumer.csproj" --source "$package_dir" --source https://api.nuget.org/v3/index.json --packages "$consumer_dir/packages"
-dotnet build "$consumer_dir/application/Consumer.csproj" -c Release --no-restore
-if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis|ConstExpr\.Core|ConstExpr\.Roslyn' "$consumer_dir/application/bin/Release/net10.0/Consumer.deps.json"; then
+dotnet build "$consumer_dir/application/Consumer.csproj" -c Release --no-restore -p:UseSharedCompilation=false
+dotnet run --project "$consumer_dir/application/Consumer.csproj" -c Release --no-build --no-restore
+if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis|ConstExpr\.Core|ConstExpr\.Roslyn|System\.Text\.Json' "$consumer_dir/application/bin/Release/net10.0/Consumer.deps.json"; then
   echo 'Build-time dependencies must not enter the application runtime dependency graph.' >&2
   exit 1
 fi
-if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis' "$consumer_dir/application/obj/project.assets.json"; then
+if grep -Eqi '"(ArchonAnalysers|Microsoft\.CodeAnalysis[^"/]*|System\.Text\.Json)/' "$consumer_dir/application/obj/project.assets.json"; then
   echo 'Build-time packages must not be restored for consumers.' >&2
   exit 1
 fi
