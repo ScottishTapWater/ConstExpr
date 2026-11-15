@@ -17,10 +17,13 @@ internal sealed class GeneratorRun
 	internal Compilation Compilation { get; }
 	internal GeneratorDriverRunResult Result => Driver.GetRunResult();
 
-	internal bool HasInterceptor => Result.GeneratedTrees
-		.SelectMany(tree => tree.GetRoot().DescendantNodes().OfType<AttributeSyntax>())
-		.Any(attribute => attribute.Name.ToString().EndsWith("InterceptsLocationAttribute", StringComparison.Ordinal)
-			|| attribute.Name.ToString().EndsWith("InterceptsLocation", StringComparison.Ordinal));
+	internal bool HasInterceptor => Compilation.SyntaxTrees.Except(Result.GeneratedTrees)
+		.Any(tree =>
+		{
+			SemanticModel model = Compilation.GetSemanticModel(tree);
+			return tree.GetRoot().DescendantNodes().OfType<InvocationExpressionSyntax>()
+				.Any(invocation => model.GetInterceptorMethod(invocation) is not null);
+		});
 
 	internal static GeneratorRun Create(CSharpCompilation input, GeneratorDriver? driver = null)
 	{

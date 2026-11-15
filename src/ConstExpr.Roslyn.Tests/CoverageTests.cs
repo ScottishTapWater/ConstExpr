@@ -67,7 +67,7 @@ public sealed class CoverageTests
 				public static int Calls => counter;
 
 				[ConstExpr]
-				public static int CountUp() => ++counter;
+				public static int CountUp() => 100 + ++counter;
 			}
 			""";
 		const string caller = """
@@ -79,12 +79,14 @@ public sealed class CoverageTests
 			{
 				public static CoverageTests.TwoCounterExecutionResult Run()
 				{
-					int[] values = new int[3];
-					for (int index = 0; index < values.Length; index++)
+					int[] counterValues = new int[3];
+					int[] otherCounterValues = new int[3];
+					for (int index = 0; index < counterValues.Length; index++)
 					{
-						values[index] = Counter.CountUp() + OtherCounter.CountUp();
+						counterValues[index] = Counter.CountUp();
+						otherCounterValues[index] = OtherCounter.CountUp();
 					}
-					return new CoverageTests.TwoCounterExecutionResult(values, Counter.Calls, OtherCounter.Calls);
+					return new CoverageTests.TwoCounterExecutionResult(counterValues, otherCounterValues, Counter.Calls, OtherCounter.Calls);
 				}
 			}
 			""";
@@ -94,9 +96,13 @@ public sealed class CoverageTests
 			new("Caller.cs", caller)
 			], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 2, 2, 2 });
-		await Assert.That(result.CounterRuntimeCalls).IsEqualTo(0);
-		await Assert.That(result.OtherCounterRuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.CounterValues).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.OtherCounterValues).IsEquivalentTo(new[] { 101, 101, 101 });
+			await Assert.That(result.CounterRuntimeCalls).IsEqualTo(0);
+			await Assert.That(result.OtherCounterRuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -131,5 +137,5 @@ public sealed class CoverageTests
 		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
 	}
 
-	public sealed record TwoCounterExecutionResult(int[] Values, int CounterRuntimeCalls, int OtherCounterRuntimeCalls);
+	public sealed record TwoCounterExecutionResult(int[] CounterValues, int[] OtherCounterValues, int CounterRuntimeCalls, int OtherCounterRuntimeCalls);
 }
