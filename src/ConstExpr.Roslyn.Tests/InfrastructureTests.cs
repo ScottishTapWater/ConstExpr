@@ -65,8 +65,11 @@ public sealed class InfrastructureTests
 
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		}
 	}
 
 	[Test]
@@ -77,8 +80,11 @@ public sealed class InfrastructureTests
 
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 7, 7, 7 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 7, 7, 7 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -91,8 +97,11 @@ public sealed class InfrastructureTests
 
 		ExecutionResult result = await second.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		}
 	}
 
 	private sealed class LookalikeAttributeGenerator : IIncrementalGenerator

@@ -17,8 +17,11 @@ public sealed class RegenerationTests
 		using LoadedFixture fixture = new(updated.Compilation);
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -32,8 +35,11 @@ public sealed class RegenerationTests
 		using LoadedFixture fixture = new(updated.Compilation);
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -49,8 +55,11 @@ public sealed class RegenerationTests
 		using LoadedFixture fixture = new(updated.Compilation);
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -64,8 +73,11 @@ public sealed class RegenerationTests
 		using LoadedFixture fixture = new(updated.Compilation);
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -79,10 +91,13 @@ public sealed class RegenerationTests
 		using LoadedFixture fixture = new(updated.Compilation);
 		ExecutionResult result = await fixture.Run<ExecutionResult>("Fixture.Caller.Run");
 
-		await Assert.That(initial.HasInterceptor).IsTrue();
-		await Assert.That(updated.HasInterceptor).IsFalse();
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 42, 42, 42 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(initial.HasInterceptor).IsTrue();
+			await Assert.That(updated.HasInterceptor).IsFalse();
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 42, 42, 42 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	private static Task<CSharpCompilation> Input() => CompilationFixture.Create(

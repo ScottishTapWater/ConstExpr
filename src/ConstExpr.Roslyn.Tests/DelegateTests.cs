@@ -12,8 +12,11 @@ public sealed class DelegateTests
 		ExecutionResult result = await ConstExprFixture.CompileAndRun(
 			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations))], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -24,7 +27,10 @@ public sealed class DelegateTests
 		ExecutionResult result = await ConstExprFixture.CompileAndRun(
 			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations))], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		}
 	}
 }

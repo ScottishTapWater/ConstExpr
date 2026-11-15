@@ -34,8 +34,11 @@ public sealed class CoverageTests
 			""";
 		ExecutionResult result = await ConstExprFixture.CompileAndRun([new("Program.cs", source)], "Fixture.Counter.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -49,8 +52,11 @@ public sealed class CoverageTests
 			new("Caller.cs", FixtureSources.Caller("First.Next() + Second.Next()"))
 			], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { result.Values[0], result.Values[0], result.Values[0] });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -133,8 +139,11 @@ public sealed class CoverageTests
 			""";
 		ExecutionResult result = await ConstExprFixture.CompileAndRun([new("Program.cs", source)], "Fixture.Counter.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 2, 3 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(3);
+		}
 	}
 
 	public sealed record TwoCounterExecutionResult(int[] CounterValues, int[] OtherCounterValues, int CounterRuntimeCalls, int OtherCounterRuntimeCalls);

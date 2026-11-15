@@ -10,8 +10,11 @@ public sealed class DirectCallTests
 	{
 		ExecutionResult result = await ConstExprFixture.CompileAndRun(testCase.Sources, testCase.EntryPoint);
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	public static IEnumerable<Func<DirectCallTestCase>> DirectCallCases()

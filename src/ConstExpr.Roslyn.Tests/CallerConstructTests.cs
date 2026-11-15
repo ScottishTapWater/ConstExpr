@@ -12,8 +12,11 @@ public sealed class CallerConstructTests
 		ExecutionResult result = await ConstExprFixture.CompileAndRun(
 			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller)], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	[Test]
@@ -47,8 +50,11 @@ public sealed class CallerConstructTests
 		ExecutionResult result = await ConstExprFixture.CompileAndRun(
 			[new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller)], "Fixture.Caller.Run");
 
-		await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
-		await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		using (Assert.Multiple())
+		{
+			await Assert.That(result.Values).IsEquivalentTo(new[] { 1, 1, 1 });
+			await Assert.That(result.RuntimeCalls).IsEqualTo(0);
+		}
 	}
 
 	public static IEnumerable<Func<CallerConstructCase>> SynchronousCallers()
