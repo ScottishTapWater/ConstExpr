@@ -126,6 +126,13 @@ internal sealed class CallExpressionCompiler
 				? rewritten.WithArgumentList(rewritten.ArgumentList.WithArguments(PreserveCallerInformation(rewritten.ArgumentList.Arguments, property.Arguments))) : rewritten;
 		}
 
+		public override SyntaxNode? VisitElementBindingExpression(ElementBindingExpressionSyntax node)
+		{
+			ElementBindingExpressionSyntax rewritten = (ElementBindingExpressionSyntax)base.VisitElementBindingExpression(node)!;
+			return _model.GetOperation(node) is IPropertyReferenceOperation property
+				? rewritten.WithArgumentList(rewritten.ArgumentList.WithArguments(PreserveCallerInformation(rewritten.ArgumentList.Arguments, property.Arguments))) : rewritten;
+		}
+
 		public override SyntaxNode? VisitInitializerExpression(InitializerExpressionSyntax node)
 		{
 			InitializerExpressionSyntax rewritten = (InitializerExpressionSyntax)base.VisitInitializerExpression(node)!;
@@ -144,12 +151,10 @@ internal sealed class CallExpressionCompiler
 				ExpressionSyntax element = rewritten.Expressions[index];
 				SeparatedSyntaxList<ExpressionSyntax> arguments = element is InitializerExpressionSyntax complex
 					? complex.Expressions : SyntaxFactory.SingletonSeparatedList(element);
-				foreach (IArgumentOperation argument in invocation.Arguments.Where(argument => argument.IsImplicit && argument.ArgumentKind == ArgumentKind.DefaultValue))
+				foreach (IArgumentOperation argument in invocation.Arguments.Where(argument => argument.IsImplicit
+					&& (argument.ArgumentKind == ArgumentKind.DefaultValue || argument.Parameter!.IsParams)))
 				{
-					ExpressionSyntax value = argument.Value.ConstantValue is { HasValue: true } constant
-						? ConstantExpression(constant.Value, argument.Parameter!.Type)
-						: SyntaxFactory.DefaultExpression(SyntaxFactory.ParseTypeName(argument.Parameter!.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
-					arguments = arguments.Add(value);
+					arguments = arguments.Add(OmittedArgumentValue(argument));
 				}
 				rewritten = rewritten.WithExpressions(rewritten.Expressions.Replace(element,
 					SyntaxFactory.InitializerExpression(SyntaxKind.ComplexElementInitializerExpression, arguments)));
@@ -159,13 +164,31 @@ internal sealed class CallExpressionCompiler
 
 		private static SeparatedSyntaxList<ArgumentSyntax> PreserveCallerInformation(SeparatedSyntaxList<ArgumentSyntax> arguments, ImmutableArray<IArgumentOperation> boundArguments)
 		{
-			foreach (IArgumentOperation argument in boundArguments.Where(argument => argument.IsImplicit
-				&& argument.ArgumentKind == ArgumentKind.DefaultValue && HasCallerInformation(argument.Parameter!)))
+			if (!boundArguments.Any(argument => argument.IsImplicit && HasCallerInformation(argument.Parameter!)))
 			{
-				arguments = arguments.Add(SyntaxFactory.Argument(ConstantExpression(argument.Value.ConstantValue.Value, argument.Parameter!.Type))
-					.WithNameColon(SyntaxFactory.NameColon((IdentifierNameSyntax)SyntaxFactory.ParseName("@" + argument.Parameter.Name))));
+				return arguments;
+			}
+			foreach (IArgumentOperation argument in boundArguments.Where(argument => argument.IsImplicit
+				&& (argument.Parameter!.IsParams || argument.ArgumentKind == ArgumentKind.DefaultValue && HasCallerInformation(argument.Parameter))))
+			{
+				arguments = arguments.Add(SyntaxFactory.Argument(OmittedArgumentValue(argument))
+					.WithNameColon(SyntaxFactory.NameColon((IdentifierNameSyntax)SyntaxFactory.ParseName("@" + argument.Parameter!.Name))));
 			}
 			return arguments;
+		}
+
+		private static ExpressionSyntax OmittedArgumentValue(IArgumentOperation argument)
+		{
+			ITypeSymbol type = argument.Parameter!.Type;
+			if (argument.Parameter.IsParams)
+			{
+				return type is IArrayTypeSymbol array
+					? SyntaxFactory.ParseExpression($"global::System.Array.Empty<{array.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}>()")
+					: SyntaxFactory.CastExpression(SyntaxFactory.ParseTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)), SyntaxFactory.ParseExpression("[]"));
+			}
+			return argument.Value.ConstantValue is { HasValue: true } constant
+				? ConstantExpression(constant.Value, type)
+				: SyntaxFactory.DefaultExpression(SyntaxFactory.ParseTypeName(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
 		}
 
 		private static bool HasCallerInformation(IParameterSymbol parameter) => parameter.GetAttributes().Any(attribute =>
