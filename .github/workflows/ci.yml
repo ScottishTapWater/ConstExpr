@@ -27,7 +27,7 @@ jobs:
         run: dotnet format src/ConstExpr.slnx --verify-no-changes --no-restore
       - name: Pack
         run: dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/packages -p:Version="$VERSION" -p:ContinuousIntegrationBuild=true
-      - name: Check package and generator loading
+      - name: Check package layout
         run: bash .github/scripts/check-package.sh "$VERSION"
       - uses: actions/upload-artifact@v6
         with:

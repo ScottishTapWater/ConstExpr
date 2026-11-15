@@ -15,6 +15,7 @@ Evaluation currently compiles and loads the original compilation inside the comp
 | `ConstExpr.Roslyn` | Compiler integration and interceptor generation in `ConstExpr.Roslyn.Generators`. |
 | `ConstExpr.Core.Tests` | TUnit tests for evaluation and serialisation. |
 | `ConstExpr.Roslyn.Tests` | Compiler controls, pipeline tests, call-site theories, and source-edit tests. |
+| `ConstExpr.IntegrationTests` | A consumer build and run using a temporary NuGet package. |
 
 Roslyn references Core and contracts. Core references contracts. ArchonAnalysers enforces this direction and forbids `Microsoft.CodeAnalysis*` assembly references from Core and contracts. It is a private development dependency in every project and is excluded from the consumer package.
 
@@ -32,7 +33,7 @@ dotnet pack src/ConstExpr.slnx -c Release --no-build --no-restore -o artifacts/p
 bash .github/scripts/check-package.sh 0.1.0
 ```
 
-The package check validates the NuGet layout and builds and runs a consumer that exercises evaluation, serialisation, and interception using the packaged generator.
+The package check validates the NuGet layout and dependency metadata. The integration test packs ConstExpr, then builds and runs a temporary consumer using that package.
 
 ## Tests
 
