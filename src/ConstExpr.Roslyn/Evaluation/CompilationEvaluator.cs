@@ -13,8 +13,9 @@ internal sealed class CompilationEvaluator
 	private readonly CSharpCompilation _compilation;
 	private readonly MethodEvaluator _evaluator;
 	private readonly ResultSerializer _serializer;
-	private readonly Dictionary<IMethodSymbol, Dictionary<string, string>> _results = new(SymbolEqualityComparer.Default);
+	private readonly Dictionary<IMethodSymbol, Dictionary<string, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
+	private int _nextResultId;
 
 	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer)
 	{
@@ -23,15 +24,15 @@ internal sealed class CompilationEvaluator
 		_serializer = serializer;
 	}
 
-	internal string Evaluate(IMethodSymbol method, int[] arguments, CancellationToken cancellationToken)
+	internal EvaluatedResult Evaluate(IMethodSymbol method, int[] arguments, CancellationToken cancellationToken)
 	{
-		if (!_results.TryGetValue(method, out Dictionary<string, string>? methodResults))
+		if (!_results.TryGetValue(method, out Dictionary<string, EvaluatedResult>? methodResults))
 		{
 			methodResults = new();
 			_results.Add(method, methodResults);
 		}
 		string argumentKey = _serializer.Serialize(arguments, typeof(int[]));
-		if (!methodResults.TryGetValue(argumentKey, out string? literal))
+		if (!methodResults.TryGetValue(argumentKey, out EvaluatedResult? result))
 		{
 			_assembly ??= Compile(cancellationToken);
 			Type type = _assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
@@ -39,10 +40,11 @@ internal sealed class CompilationEvaluator
 			MethodInfo entrypoint = type.GetMethod(method.MetadataName,
 				BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameterTypes, null)!;
 			object?[] values = arguments.Select(value => (object?)value).ToArray();
-			literal = _serializer.Serialize(_evaluator.Evaluate(entrypoint, values), typeof(int));
-			methodResults.Add(argumentKey, literal);
+			string json = _serializer.Serialize(_evaluator.Evaluate(entrypoint, values), entrypoint.ReturnType);
+			result = new(_nextResultId++, json);
+			methodResults.Add(argumentKey, result);
 		}
-		return literal;
+		return result;
 	}
 
 	private Assembly Compile(CancellationToken cancellationToken)

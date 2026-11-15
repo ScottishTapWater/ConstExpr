@@ -1,5 +1,5 @@
-using System.Collections.Immutable;
 using System.Text;
+using ConstExpr.Roslyn.Evaluation;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -8,18 +8,28 @@ namespace ConstExpr.Roslyn.Generation;
 internal sealed class InterceptorSourceBuilder
 {
 	private readonly StringBuilder _methods = new();
+	private readonly StringBuilder _fields = new();
+	private readonly HashSet<int> _results = new();
 	private int _count;
 
 	internal bool HasInterceptors => _count > 0;
 
-	internal void Add(InterceptableLocation location, ImmutableArray<IParameterSymbol> parameters, string literal)
+	internal void Add(InterceptableLocation location, IMethodSymbol method, EvaluatedResult result)
 	{
+		string returnType = method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat
+			.WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
+		if (_results.Add(result.Id))
+		{
+			string json = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(result.Json, quote: true);
+			_fields.AppendLine($"private static readonly {returnType} Result{result.Id} = global::System.Text.Json.JsonSerializer.Deserialize<{returnType}>({json})!;");
+		}
 		_methods.AppendLine($"[System.Runtime.CompilerServices.InterceptsLocation({location.Version}, \"{location.Data}\")]");
-		string signature = string.Join(", ", parameters.Select(parameter => $"int @{parameter.Name}"));
-		_methods.AppendLine($"public static int Invoke{_count++}({signature}) => {literal};");
+		string signature = string.Join(", ", method.Parameters.Select(parameter => $"int @{parameter.Name}"));
+		_methods.AppendLine($"public static {returnType} Invoke{_count++}({signature}) => Result{result.Id};");
 	}
 
 	internal string Build() => $$"""
+		#nullable enable
 		namespace System.Runtime.CompilerServices
 		{
 			[System.AttributeUsage(System.AttributeTargets.Method, AllowMultiple = true)]
@@ -32,6 +42,7 @@ internal sealed class InterceptorSourceBuilder
 		{
 			file static class Interceptors
 			{
+				{{_fields}}
 				{{_methods}}
 			}
 		}

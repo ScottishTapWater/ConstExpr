@@ -2,9 +2,9 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The generator evaluates static `[ConstExpr]` methods returning `int` during compilation and generates interceptors that return their precomputed values. Methods can be parameterless or accept `int` parameters. Calls with constant arguments are intercepted; calls with any nonconstant argument report warning `CONSTEXPR002` and run normally at runtime. Method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
+The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json and are deserialised once into a shared static field per method and argument combination. Collections, ordinary DTOs, and null results are supported. Methods can be parameterless or accept `int` parameters. Calls with constant arguments are intercepted; calls with any nonconstant argument report warning `CONSTEXPR002` and run normally at runtime. Method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
-Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. General result types and isolated execution are outside this initial slice.
+Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. Isolated execution and custom converters are outside the current implementation.
 
 ## Structure
 
@@ -19,7 +19,7 @@ Evaluation currently compiles and loads the original compilation inside the comp
 
 Roslyn references Core and contracts. Core references contracts. ArchonAnalysers enforces this direction and forbids `Microsoft.CodeAnalysis*` assembly references from Core and contracts. It is a private development dependency in every project and is excluded from the consumer package.
 
-The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. System.Text.Json and its transitive dependencies are bundled beside the generator. Core, Roslyn, and the bundled dependencies are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
+The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. System.Text.Json and its transitive dependencies are bundled beside the generator, and a public System.Text.Json package dependency supplies runtime deserialisation. Core and Roslyn are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
 
 The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK.
 

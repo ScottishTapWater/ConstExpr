@@ -36,9 +36,9 @@ public sealed class PackagedConsumerTests : IDisposable
 			public static class Program
 			{
 				[ConstExpr]
-				public static int GetValue() => 1;
+				public static int[] GetValue() => [1, 2, 3];
 
-				public static void Main() => System.Console.WriteLine(GetValue());
+				public static void Main() => System.Console.WriteLine(GetValue()[0]);
 			}
 			""");
 

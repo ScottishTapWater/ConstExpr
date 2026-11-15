@@ -32,7 +32,8 @@ if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis' "$scratch_dir/contents.tx
   exit 1
 fi
 unzip -p "$package" ConstExpr.nuspec > "$scratch_dir/ConstExpr.nuspec"
-if grep '<dependency ' "$scratch_dir/ConstExpr.nuspec" | grep -v 'id="NETStandard.Library"'; then
+if grep '<dependency ' "$scratch_dir/ConstExpr.nuspec" | grep -Ev 'id="(NETStandard.Library|System.Text.Json)"'; then
   echo 'The package must not expose build-time package dependencies.' >&2
   exit 1
 fi
+grep 'dependency id="System.Text.Json"' "$scratch_dir/ConstExpr.nuspec"
