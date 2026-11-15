@@ -6,6 +6,7 @@ namespace ConstExpr.Roslyn.Evaluation;
 internal sealed class ArgumentExpressionAnalysis : OperationWalker
 {
 	private readonly SyntaxNode _call;
+	private readonly HashSet<IParameterSymbol> _argumentParameters = new(SymbolEqualityComparer.Default);
 	private bool _canEvaluate = true;
 
 	private ArgumentExpressionAnalysis(SyntaxNode call)
@@ -47,7 +48,14 @@ internal sealed class ArgumentExpressionAnalysis : OperationWalker
 
 	public override void VisitParameterReference(IParameterReferenceOperation operation)
 	{
-		_canEvaluate &= IsDeclaredInsideCall(operation.Parameter);
+		_canEvaluate &= _argumentParameters.Contains(operation.Parameter) || IsDeclaredInsideCall(operation.Parameter);
+	}
+
+	public override void VisitAnonymousFunction(IAnonymousFunctionOperation operation)
+	{
+		_argumentParameters.UnionWith(operation.Symbol.Parameters);
+		base.VisitAnonymousFunction(operation);
+		_argumentParameters.ExceptWith(operation.Symbol.Parameters);
 	}
 
 	public override void VisitInstanceReference(IInstanceReferenceOperation operation)

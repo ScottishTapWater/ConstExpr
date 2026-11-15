@@ -303,6 +303,7 @@ public sealed class BuildTimeArgumentTests
 		() => new("Array construction", "int[]", "new[] { 20, 22 }", "value.Sum()"),
 		() => new("Collection expression", "List<int>", "[20, 22]", "value.Sum()"),
 		() => new("List initialiser", "IReadOnlyList<int>", "new List<int> { 20, 22 }", "value.Sum()"),
+		() => new("LINQ query", "IEnumerable<int>", "from value in new[] { 10, 11 } select value * 2", "value.Sum()"),
 		() => new("Dictionary initialiser", "IReadOnlyDictionary<string, int>", "new Dictionary<string, int> { [\"answer\"] = 42 }", "value[\"answer\"]"),
 		() => new("Private input state", "InputAlias", "new InputAlias(42)", "value.Read()"),
 		() => new("Target typed construction", "InputAlias", "new(42)", "value.Read()"),

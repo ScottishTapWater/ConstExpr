@@ -4,7 +4,9 @@ A C# analyser and source generator library targeting .NET Standard 2.0.
 
 The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json. Collections, ordinary DTOs, and null results are supported. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
-Arguments can be C# expressions, including constructors, collection expressions, static factories, fields, properties and lambdas. Input objects do not need to be serialisable. Expressions execute against the build environment; ConstExpr does not prove purity or determinism. Arguments requiring caller runtime locals, parameters, an instance or unresolved generic types report warning `CONSTEXPR002` and leave the call running normally at runtime. Following local assignments is not supported.
+Arguments can be C# expressions, including constructors, collection expressions, queries, static factories, fields, properties, lambdas and awaited inputs. Input objects do not need to be serialisable. Expressions execute against the build environment; ConstExpr does not prove purity or determinism. Arguments requiring caller runtime locals, parameters, an instance or unresolved generic types report warning `CONSTEXPR002` and leave the call running normally at runtime. Following local assignments is not supported.
+
+Parameter types must be accessible to generated interceptors. Calls whose signatures contain private or file-local types report warning `CONSTEXPR005` and run normally at runtime.
 
 Successfully precomputed calls with nonconstant arguments report warning `CONSTEXPR004`: argument expressions still execute at runtime, but their values are ignored, even if those values change. Move argument construction inside the `[ConstExpr]` method to avoid that runtime work.
 

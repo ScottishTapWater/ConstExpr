@@ -20,6 +20,10 @@ internal sealed class CallSiteProcessor
 		"CONSTEXPR004", "Argument expressions still execute at runtime",
 		"Call to '{0}' uses a precomputed result; argument expressions still execute at runtime but their values are ignored. Move argument construction inside the [ConstExpr] method to avoid this runtime work.",
 		"ConstExpr", DiagnosticSeverity.Warning, true);
+	private static readonly DiagnosticDescriptor _inaccessibleSignature = new(
+		"CONSTEXPR005", "Parameter types are inaccessible to generated interceptors",
+		"Call to '{0}' will run at runtime because its parameter types are inaccessible to generated interceptors",
+		"ConstExpr", DiagnosticSeverity.Warning, true);
 #pragma warning restore RS2008
 
 	private readonly CompilationEvaluator _evaluator;
@@ -43,6 +47,11 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
+			if (method.Parameters.Any(parameter => !IsAccessible(parameter.Type, compilation)))
+			{
+				context.ReportDiagnostic(Diagnostic.Create(_inaccessibleSignature, call.GetLocation(), method.ToDisplayString()));
+				continue;
+			}
 			bool constantArguments = TryGetConstantArguments(invocation, out object?[] arguments);
 			bool scalarArguments = constantArguments && method.Parameters.All(parameter => IsConstantType(parameter.Type));
 			if (!ArgumentExpressionAnalysis.CanEvaluate(invocation)
@@ -95,6 +104,15 @@ internal sealed class CallSiteProcessor
 		or SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16
 		or SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
 		or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+
+	private static bool IsAccessible(ITypeSymbol type, Compilation compilation) => type switch
+	{
+		IArrayTypeSymbol array => IsAccessible(array.ElementType, compilation),
+		INamedTypeSymbol named => !named.IsFileLocal && compilation.IsSymbolAccessibleWithin(named, compilation.Assembly)
+			&& named.TypeArguments.All(argument => IsAccessible(argument, compilation))
+			&& (named.ContainingType is null || IsAccessible(named.ContainingType, compilation)),
+		_ => true
+	};
 
 	private static bool TryGetConstantArguments(IInvocationOperation invocation, out object?[] arguments)
 	{
