@@ -13,7 +13,7 @@ internal sealed class CompilationEvaluator
 	private readonly CSharpCompilation _compilation;
 	private readonly MethodEvaluator _evaluator;
 	private readonly ResultSerializer _serializer;
-	private readonly Dictionary<IMethodSymbol, Dictionary<int, string>> _results = new(SymbolEqualityComparer.Default);
+	private readonly Dictionary<IMethodSymbol, Dictionary<string, string>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
 
 	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer)
@@ -23,23 +23,24 @@ internal sealed class CompilationEvaluator
 		_serializer = serializer;
 	}
 
-	internal string Evaluate(IMethodSymbol method, int? argument, CancellationToken cancellationToken)
+	internal string Evaluate(IMethodSymbol method, int[] arguments, CancellationToken cancellationToken)
 	{
-		if (!_results.TryGetValue(method, out Dictionary<int, string>? methodResults))
+		if (!_results.TryGetValue(method, out Dictionary<string, string>? methodResults))
 		{
 			methodResults = new();
 			_results.Add(method, methodResults);
 		}
-		if (!methodResults.TryGetValue(argument.GetValueOrDefault(), out string? literal))
+		string argumentKey = _serializer.Serialize(arguments, typeof(int[]));
+		if (!methodResults.TryGetValue(argumentKey, out string? literal))
 		{
 			_assembly ??= Compile(cancellationToken);
 			Type type = _assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
-			Type[] parameterTypes = argument.HasValue ? [typeof(int)] : Type.EmptyTypes;
+			Type[] parameterTypes = Enumerable.Repeat(typeof(int), arguments.Length).ToArray();
 			MethodInfo entrypoint = type.GetMethod(method.MetadataName,
 				BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameterTypes, null)!;
-			object?[] arguments = argument.HasValue ? [argument.Value] : [];
-			literal = _serializer.Serialize(_evaluator.Evaluate(entrypoint, arguments), typeof(int));
-			methodResults.Add(argument.GetValueOrDefault(), literal);
+			object?[] values = arguments.Select(value => (object?)value).ToArray();
+			literal = _serializer.Serialize(_evaluator.Evaluate(entrypoint, values), typeof(int));
+			methodResults.Add(argumentKey, literal);
 		}
 		return literal;
 	}

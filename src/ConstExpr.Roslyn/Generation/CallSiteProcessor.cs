@@ -14,7 +14,7 @@ internal sealed class CallSiteProcessor
 		"CONSTEXPR001", "Compile-time evaluation failed", "{0}", "ConstExpr", DiagnosticSeverity.Error, true);
 	private static readonly DiagnosticDescriptor _nonconstantArgument = new(
 		"CONSTEXPR002", "Argument is not a compile-time constant",
-		"Call to '{0}' will run at runtime because its argument is not a compile-time constant",
+		"Call to '{0}' will run at runtime because at least one argument is not a compile-time constant",
 		"ConstExpr", DiagnosticSeverity.Warning, true);
 #pragma warning restore RS2008
 
@@ -39,7 +39,7 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
-			if (!TryGetConstantArgument(invocation, out int? argument))
+			if (!TryGetConstantArguments(invocation, out int[] arguments))
 			{
 				context.ReportDiagnostic(Diagnostic.Create(_nonconstantArgument, call.GetLocation(), method.ToDisplayString()));
 				continue;
@@ -51,8 +51,8 @@ internal sealed class CallSiteProcessor
 			}
 			try
 			{
-				string literal = _evaluator.Evaluate(method, argument, context.CancellationToken);
-				_source.Add(location, method.Parameters.Length, literal);
+				string literal = _evaluator.Evaluate(method, arguments, context.CancellationToken);
+				_source.Add(location, method.Parameters, literal);
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -69,24 +69,23 @@ internal sealed class CallSiteProcessor
 	private static bool IsSupported(IMethodSymbol method)
 	{
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
-			&& method.Parameters.Length <= 1 && !method.IsGenericMethod && !method.ContainingType.IsGenericType
+			&& !method.IsGenericMethod && !method.ContainingType.IsGenericType
 			&& method.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)
 			&& !method.ReturnsByRef && !method.ReturnsByRefReadonly && method.ReturnType.SpecialType == SpecialType.System_Int32
 			&& method.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "ConstExpr.ConstExprAttribute");
 	}
 
-	private static bool TryGetConstantArgument(IInvocationOperation invocation, out int? argument)
+	private static bool TryGetConstantArguments(IInvocationOperation invocation, out int[] arguments)
 	{
-		argument = null;
-		if (invocation.Arguments.Length == 0)
+		arguments = new int[invocation.TargetMethod.Parameters.Length];
+		foreach (IArgumentOperation argument in invocation.Arguments)
 		{
-			return true;
+			if (argument.Value.ConstantValue is not { HasValue: true, Value: int value })
+			{
+				return false;
+			}
+			arguments[argument.Parameter!.Ordinal] = value;
 		}
-		if (invocation.Arguments[0].Value.ConstantValue is { HasValue: true, Value: int value })
-		{
-			argument = value;
-			return true;
-		}
-		return false;
+		return true;
 	}
 }
