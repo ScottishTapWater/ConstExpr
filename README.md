@@ -4,6 +4,8 @@ A C# analyser and source generator library targeting .NET Standard 2.0.
 
 The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json and are deserialised once into a shared static field per method and argument combination. Collections, ordinary DTOs, and null results are supported. Parameters support C# constant types: strings, characters, booleans, numeric primitives, decimals, and enums. Calls with constant arguments are intercepted; calls with any nonconstant argument report warning `CONSTEXPR002` and run normally at runtime. Method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
+Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`. Each method and argument combination has its own shared graph.
+
 Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. Isolated execution and custom converters are outside the current implementation.
 
 ## Structure

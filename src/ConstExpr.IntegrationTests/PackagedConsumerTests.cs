@@ -31,14 +31,27 @@ public sealed class PackagedConsumerTests : IDisposable
 			</Project>
 			""");
 		await File.WriteAllTextAsync(Path.Combine(_directory.FullName, "Program.cs"), """
+			#nullable enable
 			using ConstExpr;
+			using System.Collections.Generic;
+
+			public sealed class Node
+			{
+				public int Value { get; set; }
+				public List<Node> Children { get; set; } = [];
+			}
 
 			public static class Program
 			{
 				[ConstExpr]
-				public static int[] GetValue() => [1, 2, 3];
+				public static Node GetValue()
+				{
+					Node node = new() { Value = 1 };
+					node.Children.Add(node);
+					return node;
+				}
 
-				public static void Main() => System.Console.WriteLine(GetValue()[0]);
+				public static void Main() => System.Console.WriteLine(GetValue().Value);
 			}
 			""");
 

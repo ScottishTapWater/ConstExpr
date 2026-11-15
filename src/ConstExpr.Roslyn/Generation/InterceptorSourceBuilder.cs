@@ -47,6 +47,7 @@ internal sealed class InterceptorSourceBuilder
 				private static readonly global::System.Text.Json.JsonSerializerOptions Options = new()
 				{
 					NumberHandling = global::System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
+					ReferenceHandler = global::System.Text.Json.Serialization.ReferenceHandler.Preserve,
 				};
 				{{_fields}}
 				{{_methods}}
