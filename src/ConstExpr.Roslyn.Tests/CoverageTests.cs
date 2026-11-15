@@ -8,7 +8,30 @@ public sealed class CoverageTests
 	[Test]
 	public async Task EveryCallSiteInTheSameMethodUsesAPrecomputedResult()
 	{
-		string source = FixtureSources.Simple.Replace("CountUp();", "CountUp() + CountUp();", StringComparison.Ordinal);
+		const string source = """
+			using ConstExpr;
+
+			namespace Fixture;
+
+			public static class Counter
+			{
+				private static int counter;
+				public static int Calls => counter;
+
+				[ConstExpr]
+				public static int CountUp() => ++counter;
+
+				public static int[] Run()
+				{
+					int[] values = new int[3];
+					for (int index = 0; index < values.Length; index++)
+					{
+						values[index] = CountUp() + CountUp();
+					}
+					return values;
+				}
+			}
+			""";
 		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", source));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 
@@ -37,7 +60,20 @@ public sealed class CoverageTests
 	[Test]
 	public async Task CallsToDifferentMarkedMethodsUseTheirOwnPrecomputedResults()
 	{
-		string other = FixtureSources.Counter.Replace("class Counter", "class OtherCounter", StringComparison.Ordinal);
+		const string other = """
+			using ConstExpr;
+
+			namespace Fixture;
+
+			public static class OtherCounter
+			{
+				private static int counter;
+				public static int Calls => counter;
+
+				[ConstExpr]
+				public static int CountUp() => ++counter;
+			}
+			""";
 		CSharpCompilation input = await CompilationFixture.Create(
 			new("Counter.cs", FixtureSources.Counter), new("OtherCounter.cs", other),
 			new("Caller.cs", FixtureSources.Caller("Counter.CountUp() + OtherCounter.CountUp()")));
@@ -53,7 +89,27 @@ public sealed class CoverageTests
 	[Test]
 	public async Task CallsToUnmarkedMethodsExecuteTheOriginalMethodAtRuntime()
 	{
-		string source = FixtureSources.Simple.Replace("[ConstExpr]", "", StringComparison.Ordinal);
+		const string source = """
+			namespace Fixture;
+
+			public static class Counter
+			{
+				private static int counter;
+				public static int Calls => counter;
+
+				public static int CountUp() => ++counter;
+
+				public static int[] Run()
+				{
+					int[] values = new int[3];
+					for (int index = 0; index < values.Length; index++)
+					{
+						values[index] = CountUp();
+					}
+					return values;
+				}
+			}
+			""";
 		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", source));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 

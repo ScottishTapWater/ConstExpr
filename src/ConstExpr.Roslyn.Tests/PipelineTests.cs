@@ -53,8 +53,19 @@ public sealed class PipelineTests
 	[Test]
 	public async Task CallsToUnmarkedMethodsProduceNoGeneratedSource()
 	{
+		const string counter = """
+			namespace Fixture;
+
+			public static class Counter
+			{
+				private static int counter;
+				public static int Calls => counter;
+
+				public static int CountUp() => ++counter;
+			}
+			""";
 		ConstExprGeneratorTest test = new();
-		test.TestState.Sources.Add(("Counter.cs", FixtureSources.Counter.Replace("[ConstExpr]", "", StringComparison.Ordinal)));
+		test.TestState.Sources.Add(("Counter.cs", counter));
 		test.TestState.Sources.Add(("Caller.cs", FixtureSources.Caller()));
 
 		await test.RunAsync();
