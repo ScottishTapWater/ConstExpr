@@ -9,7 +9,7 @@ public sealed class CoverageTests
 	public async Task EveryCallSiteInTheSameMethodUsesAPrecomputedResult()
 	{
 		string source = FixtureSources.Simple.Replace("CountUp();", "CountUp() + CountUp();", StringComparison.Ordinal);
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", source));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", source));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 
 		int[] values = await fixture.Run();
@@ -24,8 +24,8 @@ public sealed class CoverageTests
 		const string first = "namespace Fixture; public static class First { public static int Next() => Counter.CountUp(); }";
 		const string second = "namespace Fixture; public static class Second { public static int Next() => Counter.CountUp(); }";
 		CSharpCompilation input = await CompilationFixture.Create(
-			("Counter.cs", FixtureSources.Counter), ("First.cs", first), ("Second.cs", second),
-			("Caller.cs", FixtureSources.Caller("First.Next() + Second.Next()")));
+			new("Counter.cs", FixtureSources.Counter), new("First.cs", first), new("Second.cs", second),
+			new("Caller.cs", FixtureSources.Caller("First.Next() + Second.Next()")));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();
@@ -39,8 +39,8 @@ public sealed class CoverageTests
 	{
 		string other = FixtureSources.Counter.Replace("class Counter", "class OtherCounter", StringComparison.Ordinal);
 		CSharpCompilation input = await CompilationFixture.Create(
-			("Counter.cs", FixtureSources.Counter), ("OtherCounter.cs", other),
-			("Caller.cs", FixtureSources.Caller("Counter.CountUp() + OtherCounter.CountUp()")));
+			new("Counter.cs", FixtureSources.Counter), new("OtherCounter.cs", other),
+			new("Caller.cs", FixtureSources.Caller("Counter.CountUp() + OtherCounter.CountUp()")));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();
@@ -54,7 +54,7 @@ public sealed class CoverageTests
 	public async Task CallsToUnmarkedMethodsExecuteTheOriginalMethodAtRuntime()
 	{
 		string source = FixtureSources.Simple.Replace("[ConstExpr]", "", StringComparison.Ordinal);
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", source));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", source));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 
 		int[] values = await fixture.Run();

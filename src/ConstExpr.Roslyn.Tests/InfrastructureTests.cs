@@ -8,7 +8,7 @@ public sealed class InfrastructureTests
 	[Test]
 	public async Task CallsWithoutInterceptionExecuteTheOriginalMethodEachTime()
 	{
-		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
+		CSharpCompilation compilation = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture fixture = new(compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();
@@ -20,7 +20,7 @@ public sealed class InfrastructureTests
 	[Test]
 	public async Task ManualInterceptionReturnsTheReplacementResultWithoutExecutingTheOriginalMethod()
 	{
-		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
+		CSharpCompilation compilation = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture fixture = new(ManualInterceptor.Add(compilation), "Fixture.Caller");
 
 		int[] values = await fixture.Run();
@@ -32,7 +32,7 @@ public sealed class InfrastructureTests
 	[Test]
 	public async Task SeparateAssemblyLoadsDoNotShareStaticState()
 	{
-		CSharpCompilation compilation = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
+		CSharpCompilation compilation = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller()));
 		using LoadedFixture first = new(compilation, "Fixture.Caller");
 		await first.Run();
 		using LoadedFixture second = new(compilation, "Fixture.Caller");

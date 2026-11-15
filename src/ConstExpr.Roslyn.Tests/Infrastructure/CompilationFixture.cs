@@ -15,12 +15,12 @@ internal static class CompilationFixture
 
 	private static readonly Task<ImmutableArray<MetadataReference>> _references = Framework.ResolveAsync(LanguageNames.CSharp, CancellationToken.None);
 
-	internal static async Task<CSharpCompilation> Create(params (string Path, string Source)[] sources)
+	internal static async Task<CSharpCompilation> Create(params SourceFile[] sources)
 	{
 		ImmutableArray<MetadataReference> references = await _references;
 		CSharpCompilation compilation = CSharpCompilation.Create(
 			$"Fixture_{Guid.NewGuid():N}",
-			sources.Select(source => CSharpSyntaxTree.ParseText(source.Source, ParseOptions, source.Path)),
+			sources.Select(source => CSharpSyntaxTree.ParseText(source.Text, ParseOptions, source.Path)),
 			references.Add(MetadataReference.CreateFromFile(typeof(ConstExprAttribute).Assembly.Location)),
 			new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 		ThrowOnErrors(compilation.GetDiagnostics());

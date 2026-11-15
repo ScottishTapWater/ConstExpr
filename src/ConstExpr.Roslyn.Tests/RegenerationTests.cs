@@ -86,7 +86,7 @@ public sealed class RegenerationTests
 	}
 
 	private static Task<CSharpCompilation> Input() => CompilationFixture.Create(
-		("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller()));
+		new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller()));
 
 	private static CSharpCompilation ReplaceCaller(CSharpCompilation input, string source)
 	{

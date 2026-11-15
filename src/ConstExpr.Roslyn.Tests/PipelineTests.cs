@@ -8,7 +8,7 @@ public sealed class PipelineTests
 	[Test]
 	public async Task GeneratesAnInterceptorForACallToAMarkedMethod()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
 
 		GeneratorRun run = GeneratorRun.Create(input);
 
@@ -18,7 +18,7 @@ public sealed class PipelineTests
 	[Test]
 	public async Task GeneratedInterceptorCanBeEmittedAsAnAssembly()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
 		GeneratorRun run = GeneratorRun.Create(input);
 		await Assert.That(run.HasInterceptor).IsTrue();
 
@@ -31,7 +31,7 @@ public sealed class PipelineTests
 	[Test]
 	public async Task RepeatedCallsToAMarkedMethodReturnItsBuildTimeResult()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 
 		int[] values = await fixture.Run();
@@ -42,7 +42,7 @@ public sealed class PipelineTests
 	[Test]
 	public async Task InterceptedCallsDoNotExecuteTheOriginalMethodAtRuntime()
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Program.cs", FixtureSources.Simple));
+		CSharpCompilation input = await CompilationFixture.Create(new SourceFile("Program.cs", FixtureSources.Simple));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation);
 
 		await fixture.Run();

@@ -10,7 +10,7 @@ public sealed class DelegateTests
 	[Arguments("lambda callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(() => Counter.CountUp())")]
 	public async Task CallsInsideLambdaDelegatesUsePrecomputedResults(string name, string declarations, string expression)
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller(expression, declarations)));
+		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations)));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();
@@ -24,7 +24,7 @@ public sealed class DelegateTests
 	[Arguments("method group callback", "static int Invoke(Func<int> callback) => callback();", "Invoke(Counter.CountUp)")]
 	public async Task MethodGroupDelegatesExecuteTheOriginalMethodOnEveryInvocation(string name, string declarations, string expression)
 	{
-		CSharpCompilation input = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", FixtureSources.Caller(expression, declarations)));
+		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", FixtureSources.Caller(expression, declarations)));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();

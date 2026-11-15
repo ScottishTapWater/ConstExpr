@@ -20,7 +20,7 @@ public sealed class CallerConstructTests
 		{
 			caller = caller.Replace("public static int[] Run()", "public static async Task<int[]> Run()", StringComparison.Ordinal);
 		}
-		CSharpCompilation input = await CompilationFixture.Create(("Counter.cs", FixtureSources.Counter), ("Caller.cs", caller));
+		CSharpCompilation input = await CompilationFixture.Create(new("Counter.cs", FixtureSources.Counter), new("Caller.cs", caller));
 		using LoadedFixture fixture = new(GeneratorRun.Create(input).Compilation, "Fixture.Caller");
 
 		int[] values = await fixture.Run();
