@@ -13,7 +13,7 @@ internal sealed class CompilationEvaluator
 	private readonly CSharpCompilation _compilation;
 	private readonly MethodEvaluator _evaluator;
 	private readonly ResultSerializer _serializer;
-	private readonly Dictionary<IMethodSymbol, Dictionary<string, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
+	private readonly Dictionary<IMethodSymbol, Dictionary<ArgumentCacheKey, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
 	private int _nextResultId;
 
@@ -24,27 +24,35 @@ internal sealed class CompilationEvaluator
 		_serializer = serializer;
 	}
 
-	internal EvaluatedResult Evaluate(IMethodSymbol method, int[] arguments, CancellationToken cancellationToken)
+	internal EvaluatedResult Evaluate(IMethodSymbol method, object?[] arguments, CancellationToken cancellationToken)
 	{
-		if (!_results.TryGetValue(method, out Dictionary<string, EvaluatedResult>? methodResults))
+		if (!_results.TryGetValue(method, out Dictionary<ArgumentCacheKey, EvaluatedResult>? methodResults))
 		{
 			methodResults = new();
 			_results.Add(method, methodResults);
 		}
-		string argumentKey = _serializer.Serialize(arguments, typeof(int[]));
+		ArgumentCacheKey argumentKey = new(arguments);
 		if (!methodResults.TryGetValue(argumentKey, out EvaluatedResult? result))
 		{
 			_assembly ??= Compile(cancellationToken);
 			Type type = _assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
-			Type[] parameterTypes = Enumerable.Repeat(typeof(int), arguments.Length).ToArray();
-			MethodInfo entrypoint = type.GetMethod(method.MetadataName,
-				BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, parameterTypes, null)!;
-			object?[] values = arguments.Select(value => (object?)value).ToArray();
+			MethodInfo entrypoint = FindMethod(type, method);
+			ParameterInfo[] parameters = entrypoint.GetParameters();
+			object?[] values = arguments.Select((value, index) => parameters[index].ParameterType.IsEnum
+				? Enum.ToObject(parameters[index].ParameterType, value!) : value).ToArray();
 			string json = _serializer.Serialize(_evaluator.Evaluate(entrypoint, values), entrypoint.ReturnType);
 			result = new(_nextResultId++, json);
 			methodResults.Add(argumentKey, result);
 		}
 		return result;
+	}
+
+	private static MethodInfo FindMethod(Type type, IMethodSymbol method)
+	{
+		return type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+			.Single(candidate => candidate.Name == method.MetadataName && !candidate.IsGenericMethod
+				&& candidate.GetParameters().Select(parameter => parameter.ParameterType.FullName)
+					.SequenceEqual(method.Parameters.Select(parameter => GetMetadataName((INamedTypeSymbol)parameter.Type))));
 	}
 
 	private Assembly Compile(CancellationToken cancellationToken)
@@ -66,6 +74,7 @@ internal sealed class CompilationEvaluator
 	{
 		return type.ContainingType is not null
 			? GetMetadataName(type.ContainingType) + "+" + type.MetadataName
-			: type.ToDisplayString();
+			: type.ContainingNamespace.IsGlobalNamespace ? type.MetadataName
+				: type.ContainingNamespace.ToDisplayString() + "." + type.MetadataName;
 	}
 }
