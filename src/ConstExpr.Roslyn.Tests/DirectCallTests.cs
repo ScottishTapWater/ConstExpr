@@ -37,4 +37,9 @@ public sealed class DirectCallTests
 	}
 
 	private static string Qualify(string method) => FixtureSources.Simple.Replace("= CountUp();", $"= {method}();", StringComparison.Ordinal);
+
+	public sealed record DirectCallTestCase(string Name, SourceFile[] Sources, string EntryType)
+	{
+		public override string ToString() => Name;
+	}
 }
