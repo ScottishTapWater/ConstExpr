@@ -5,5 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ConstExpr/ConstExpr.csproj" />
+    <InternalsVisibleTo Include="ConstExpr.Core.Tests" />
+    <InternalsVisibleTo Include="ConstExpr.Roslyn" />
   </ItemGroup>
 </Project>

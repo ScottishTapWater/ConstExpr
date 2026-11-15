@@ -34,3 +34,12 @@ jobs:
           name: packages
           path: artifacts/packages/*.nupkg
           if-no-files-found: error
+      - name: Test
+        run: dotnet test --solution src/ConstExpr.slnx -c Release --no-build --no-restore --report-trx --results-directory "$GITHUB_WORKSPACE/artifacts/test-results"
+      - name: Upload test results
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: test-results
+          path: artifacts/test-results/
+          if-no-files-found: warn
