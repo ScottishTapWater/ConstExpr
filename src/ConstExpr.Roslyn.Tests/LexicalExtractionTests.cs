@@ -74,11 +74,18 @@ public sealed class LexicalExtractionTests
 		() => new("Property initialiser", "private static string Value { get; } = Calculate(Describe());", "Value"),
 		() => new("Expression-bodied property", "private static string Value => Calculate(Describe());", "Value"),
 		() => new("Expression-bodied lambda scope", "private static string Invoke() { System.Func<int, string> next = parameter => Calculate(Describe(nameof(parameter))); return next(42); }", "Invoke()"),
-		() => new("Expression tree", "private static string Invoke() { System.Linq.Expressions.Expression<System.Func<string>> next = () => Calculate(Describe()); return next.Compile()(); }", "Invoke()")
+		() => new("Expression tree", "private static string Invoke() { System.Linq.Expressions.Expression<System.Func<string>> next = () => Calculate(Describe()); return next.Compile()(); }", "Invoke()"),
+		() => new("Expression-tree parameter name", "private static string Invoke() { System.Linq.Expressions.Expression<System.Func<int, string>> next = parameter => Calculate(Describe(nameof(parameter))); return next.Compile()(42); }", "Invoke()"),
+		() => new("Expression-tree field initialiser", "private static readonly System.Linq.Expressions.Expression<System.Func<string>> Value = () => Calculate(Describe());", "Value.Compile()()"),
+		() => new("Expression-tree property initialiser", "private static System.Linq.Expressions.Expression<System.Func<string>> Value { get; } = () => Calculate(Describe());", "Value.Compile()()"),
+		() => new("Expression-tree field parameter name", "private static readonly System.Linq.Expressions.Expression<System.Func<int, string>> Value = parameter => Calculate(Describe(nameof(parameter)));", "Value.Compile()(42)"),
+		() => new("Nested expression trees", "private static readonly System.Linq.Expressions.Expression<System.Func<System.Linq.Expressions.Expression<System.Func<int, string>>>> Value = () => parameter => Calculate(Describe(nameof(parameter)));", "Value.Compile()().Compile()(42)")
 	];
 
 	public static IEnumerable<Func<CallerContextTestCase>> LineMappingContexts() =>
 	[
+		() => new("Expression-tree field", "private static readonly System.Linq.Expressions.Expression<System.Func<int>> Value = () => Calculate(Create());", "Value.Compile()()"),
+		() => new("Expression-tree method", "private static int Read() { System.Linq.Expressions.Expression<System.Func<int>> next = () => Calculate(Create()); return next.Compile()(); }", "Read()"),
 		() => new("Block body", "private static int Read() { return Calculate(Create()); }", "Read()"),
 		() => new("Expression body", "private static int Read() => Calculate(Create());", "Read()"),
 		() => new("Field initialiser", "private static readonly int Value = Calculate(Create());", "Value"),

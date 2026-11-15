@@ -86,7 +86,7 @@ internal sealed class ArgumentExpressionAnalysis : OperationWalker
 	private bool IsDeclaredInsideCall(ISymbol symbol) => symbol.DeclaringSyntaxReferences
 		.Any(reference => reference.SyntaxTree == _call.SyntaxTree && _call.Span.Contains(reference.Span));
 
-	private static bool ContainsTypeParameter(ITypeSymbol type) => type is ITypeParameterSymbol
+	internal static bool ContainsTypeParameter(ITypeSymbol type) => type is ITypeParameterSymbol
 		|| type is IArrayTypeSymbol array && ContainsTypeParameter(array.ElementType)
 		|| type is INamedTypeSymbol named && (named.TypeArguments.Any(ContainsTypeParameter)
 			|| named.ContainingType is not null && ContainsTypeParameter(named.ContainingType));
