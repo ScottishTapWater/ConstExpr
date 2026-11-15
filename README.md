@@ -8,7 +8,7 @@ Shared references and cycles in STJ-supported object graphs are preserved using 
 
 Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
 
-Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. Isolated execution is outside the current implementation.
+Evaluation currently compiles and loads the original compilation inside the compiler process. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Isolated execution is outside the current implementation.
 
 ## Structure
 

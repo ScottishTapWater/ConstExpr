@@ -27,6 +27,7 @@ EOF
 grep '\.dll$' "$scratch_dir/contents.txt" | sort > "$scratch_dir/actual-assemblies.txt"
 diff -u "$scratch_dir/expected-assemblies.txt" "$scratch_dir/actual-assemblies.txt"
 grep -Fx 'README.md' "$scratch_dir/contents.txt"
+grep -Fx 'buildTransitive/ConstExpr.targets' "$scratch_dir/contents.txt"
 if grep -Eqi 'ArchonAnalysers|Microsoft\.CodeAnalysis' "$scratch_dir/contents.txt"; then
   echo 'Build-time dependencies must not be bundled in the package.' >&2
   exit 1

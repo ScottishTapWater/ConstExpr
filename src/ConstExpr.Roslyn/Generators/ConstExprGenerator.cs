@@ -20,13 +20,15 @@ public sealed class ConstExprGenerator : IIncrementalGenerator
 		IncrementalValuesProvider<InvocationExpressionSyntax> calls = context.SyntaxProvider.CreateSyntaxProvider(
 			static (node, _) => node is InvocationExpressionSyntax,
 			static (syntax, _) => (InvocationExpressionSyntax)syntax.Node);
-		context.RegisterSourceOutput(context.CompilationProvider.Combine(calls.Collect()),
+		context.RegisterSourceOutput(context.CompilationProvider.Combine(calls.Collect()).Combine(context.AnalyzerConfigOptionsProvider),
 			static (output, input) =>
 			{
-				CSharpCompilation compilation = (CSharpCompilation)input.Left;
-				CompilationEvaluator evaluator = new(compilation, new MethodEvaluator(), new ResultSerializer());
+				CSharpCompilation compilation = (CSharpCompilation)input.Left.Left;
+				input.Right.GlobalOptions.TryGetValue("build_property.ConstExprRuntimeAssemblies", out string? paths);
+				using EvaluationAssemblyLoader loader = new(compilation, paths?.Split(['|'], StringSplitOptions.RemoveEmptyEntries) ?? []);
+				CompilationEvaluator evaluator = new(compilation, new MethodEvaluator(), new ResultSerializer(), loader);
 				CallSiteProcessor processor = new(evaluator, new InterceptorSourceBuilder());
-				processor.Process(output, compilation, input.Right);
+				processor.Process(output, compilation, input.Left.Right);
 			});
 	}
 }
