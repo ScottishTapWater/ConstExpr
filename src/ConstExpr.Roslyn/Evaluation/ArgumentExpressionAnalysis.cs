@@ -29,6 +29,20 @@ internal sealed class ArgumentExpressionAnalysis : CSharpSyntaxWalker
 		return analysis._canEvaluate;
 	}
 
+	internal static bool HasClosedTypes(IMethodSymbol method) => !ContainsTypeParameter(method.ContainingType)
+		&& !method.TypeArguments.Any(ContainsTypeParameter);
+
+	private static bool ContainsTypeParameter(ITypeSymbol? type) => type switch
+	{
+		ITypeParameterSymbol => true,
+		IArrayTypeSymbol array => ContainsTypeParameter(array.ElementType),
+		IPointerTypeSymbol pointer => ContainsTypeParameter(pointer.PointedAtType),
+		IFunctionPointerTypeSymbol pointer => ContainsTypeParameter(pointer.Signature.ReturnType)
+			|| pointer.Signature.Parameters.Any(parameter => ContainsTypeParameter(parameter.Type)),
+		INamedTypeSymbol named => ContainsTypeParameter(named.ContainingType) || named.TypeArguments.Any(ContainsTypeParameter),
+		_ => false
+	};
+
 	public override void Visit(SyntaxNode? node)
 	{
 		_cancellationToken.ThrowIfCancellationRequested();

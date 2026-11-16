@@ -159,6 +159,50 @@ public sealed class PackagedConsumerTests : IDisposable
 		await RunDotnet("run", "--project", project, "--configuration", configuration, "--no-build", "--no-restore");
 	}
 
+	[Test]
+	public async Task ConsumerEvaluatesGenericMethodsWithTypeArgumentsFromAProjectReference()
+	{
+		string configuration = typeof(PackagedConsumerTests).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()!.Configuration;
+		string feed = await PackConstExpr(configuration);
+		await CreateHelperProject();
+		string consumer = Directory.CreateDirectory(Path.Combine(_directory.FullName, "Consumer")).FullName;
+		string project = Path.Combine(consumer, "Consumer.csproj");
+		await File.WriteAllTextAsync(project, """
+			<Project Sdk="Microsoft.NET.Sdk">
+			  <PropertyGroup>
+			    <TargetFramework>net10.0</TargetFramework>
+			    <OutputType>Exe</OutputType>
+			    <InterceptorsNamespaces>ConstExpr.Generated</InterceptorsNamespaces>
+			    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+			  </PropertyGroup>
+			  <ItemGroup>
+			    <PackageReference Include="ConstExpr" Version="0.0.0-test" />
+			    <ProjectReference Include="../Helper/Helper.csproj" />
+			  </ItemGroup>
+			</Project>
+			""");
+		await File.WriteAllTextAsync(Path.Combine(consumer, "Program.cs"), """
+			using ConstExpr;
+			using HelperLibrary;
+			public static class Program
+			{
+				private static int calls;
+				[ConstExpr]
+				public static int Calculate<T>() where T : new()
+				{
+					calls++;
+					return new T() is Calculator.Measurement ? Calculator.Create(21).Value : 0;
+				}
+				public static int Main() => Calculate<Calculator.Measurement>() == 42 && calls == 0 ? 0 : 1;
+			}
+			""");
+
+		await RunDotnet("restore", project, "--source", feed, "--source", "https://api.nuget.org/v3/index.json",
+			"--packages", Path.Combine(_directory.FullName, "packages"));
+		await RunDotnet("build", project, "--configuration", configuration, "--no-restore", "-p:UseSharedCompilation=false");
+		await RunDotnet("run", "--project", project, "--configuration", configuration, "--no-build", "--no-restore");
+	}
+
 	private async Task<string> PackConstExpr(string configuration)
 	{
 		string feed = Path.Combine(_directory.FullName, "feed");
