@@ -9,9 +9,13 @@ namespace ConstExpr.Roslyn.Generation;
 
 internal sealed class CallSiteProcessor
 {
-#pragma warning disable RS2008 // This initial diagnostic is shipped with the first implementation.
+#pragma warning disable RS2008 // Diagnostic release tracking is not configured.
 	private static readonly DiagnosticDescriptor _evaluationFailed = new(
 		"CONSTEXPR001", "Compile-time evaluation failed", "{0}", "ConstExpr", DiagnosticSeverity.Error, true);
+	private static readonly DiagnosticDescriptor _nonconstantArgument = new(
+		"CONSTEXPR002", "Argument is not a compile-time constant",
+		"Call to '{0}' will run at runtime because its argument is not a compile-time constant",
+		"ConstExpr", DiagnosticSeverity.Warning, true);
 #pragma warning restore RS2008
 
 	private readonly CompilationEvaluator _evaluator;
@@ -37,6 +41,7 @@ internal sealed class CallSiteProcessor
 			IMethodSymbol method = invocation.TargetMethod;
 			if (!TryGetConstantArgument(invocation, out int? argument))
 			{
+				context.ReportDiagnostic(Diagnostic.Create(_nonconstantArgument, call.GetLocation(), method.ToDisplayString()));
 				continue;
 			}
 			InterceptableLocation? location = model.GetInterceptableLocation(call, context.CancellationToken);

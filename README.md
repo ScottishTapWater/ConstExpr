@@ -2,7 +2,7 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The generator evaluates static `[ConstExpr]` methods returning `int` during compilation and generates interceptors that return their precomputed values. Methods can be parameterless or accept one `int` parameter supplied with a compile-time constant. Direct calls are intercepted; method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
+The generator evaluates static `[ConstExpr]` methods returning `int` during compilation and generates interceptors that return their precomputed values. Methods can be parameterless or accept one `int` parameter. Calls with constant arguments are intercepted; calls with nonconstant arguments report warning `CONSTEXPR002` and run normally at runtime. Method-group delegates continue to execute the original method. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
 Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. General result types and isolated execution are outside this initial slice.
 

@@ -1,7 +1,7 @@
 namespace ConstExpr;
 
 /// <summary>
-/// Marks a method whose result is evaluated during the build.
+/// Marks a method for build-time evaluation when its arguments are compile-time constants.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class ConstExprAttribute : Attribute
