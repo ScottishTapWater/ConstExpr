@@ -39,7 +39,7 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
-			if (!TryGetConstantArguments(invocation, out int[] arguments))
+			if (!TryGetConstantArguments(invocation, out object?[] arguments))
 			{
 				context.ReportDiagnostic(Diagnostic.Create(_nonconstantArgument, call.GetLocation(), method.ToDisplayString()));
 				continue;
@@ -70,22 +70,28 @@ internal sealed class CallSiteProcessor
 	{
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
 			&& !method.IsGenericMethod && !method.ContainingType.IsGenericType
-			&& method.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)
+			&& method.Parameters.All(parameter => IsConstantType(parameter.Type) && parameter.RefKind == RefKind.None)
 			&& !method.ReturnsVoid && !method.ReturnsByRef && !method.ReturnsByRefReadonly
 			&& !method.ReturnType.IsRefLikeType && method.ReturnType.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer)
 			&& method.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "ConstExpr.ConstExprAttribute");
 	}
 
-	private static bool TryGetConstantArguments(IInvocationOperation invocation, out int[] arguments)
+	private static bool IsConstantType(ITypeSymbol type) => type.TypeKind == TypeKind.Enum || type.SpecialType is
+		SpecialType.System_Boolean or SpecialType.System_Char or SpecialType.System_String
+		or SpecialType.System_SByte or SpecialType.System_Byte or SpecialType.System_Int16 or SpecialType.System_UInt16
+		or SpecialType.System_Int32 or SpecialType.System_UInt32 or SpecialType.System_Int64 or SpecialType.System_UInt64
+		or SpecialType.System_Single or SpecialType.System_Double or SpecialType.System_Decimal;
+
+	private static bool TryGetConstantArguments(IInvocationOperation invocation, out object?[] arguments)
 	{
-		arguments = new int[invocation.TargetMethod.Parameters.Length];
+		arguments = new object?[invocation.TargetMethod.Parameters.Length];
 		foreach (IArgumentOperation argument in invocation.Arguments)
 		{
-			if (argument.Value.ConstantValue is not { HasValue: true, Value: int value })
+			if (argument.Value.ConstantValue is not { HasValue: true } constant)
 			{
 				return false;
 			}
-			arguments[argument.Parameter!.Ordinal] = value;
+			arguments[argument.Parameter!.Ordinal] = constant.Value;
 		}
 		return true;
 	}

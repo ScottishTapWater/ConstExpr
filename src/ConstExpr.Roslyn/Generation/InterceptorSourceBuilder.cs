@@ -16,17 +16,19 @@ internal sealed class InterceptorSourceBuilder
 
 	internal void Add(InterceptableLocation location, IMethodSymbol method, EvaluatedResult result)
 	{
-		string returnType = method.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat
-			.WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
+		string returnType = FormatType(method.ReturnType);
 		if (_results.Add(result.Id))
 		{
 			string json = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(result.Json, quote: true);
-			_fields.AppendLine($"private static readonly {returnType} Result{result.Id} = global::System.Text.Json.JsonSerializer.Deserialize<{returnType}>({json})!;");
+			_fields.AppendLine($"private static readonly {returnType} Result{result.Id} = global::System.Text.Json.JsonSerializer.Deserialize<{returnType}>({json}, Options)!;");
 		}
 		_methods.AppendLine($"[System.Runtime.CompilerServices.InterceptsLocation({location.Version}, \"{location.Data}\")]");
-		string signature = string.Join(", ", method.Parameters.Select(parameter => $"int @{parameter.Name}"));
+		string signature = string.Join(", ", method.Parameters.Select(parameter => $"{FormatType(parameter.Type)} @{parameter.Name}"));
 		_methods.AppendLine($"public static {returnType} Invoke{_count++}({signature}) => Result{result.Id};");
 	}
+
+	private static string FormatType(ITypeSymbol type) => type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat
+		.WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
 
 	internal string Build() => $$"""
 		#nullable enable
@@ -42,6 +44,10 @@ internal sealed class InterceptorSourceBuilder
 		{
 			file static class Interceptors
 			{
+				private static readonly global::System.Text.Json.JsonSerializerOptions Options = new()
+				{
+					NumberHandling = global::System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
+				};
 				{{_fields}}
 				{{_methods}}
 			}
