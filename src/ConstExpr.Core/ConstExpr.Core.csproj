@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ConstExpr/ConstExpr.csproj" />
-    <PackageReference Include="System.Text.Json" Version="10.0.15" PrivateAssets="all" />
+    <PackageReference Include="System.Text.Json" Version="11.0.0" PrivateAssets="all" />
     <InternalsVisibleTo Include="ConstExpr.Core.Tests" />
     <InternalsVisibleTo Include="ConstExpr.Roslyn" />
   </ItemGroup>
