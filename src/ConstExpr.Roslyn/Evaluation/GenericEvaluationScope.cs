@@ -64,7 +64,7 @@ internal static class GenericEvaluationScope
 			return ((CompilationUnitSyntax)root).AddMembers(members);
 		}
 		TypeDeclarationSyntax changed = container.AddMembers(members);
-		SyntaxTriviaList restore = SyntaxFactory.ParseLeadingTrivia("\n" + EvaluationSourceContext.Capture(model, container.CloseBraceToken.SpanStart) + CallExpressionCompiler.LineDirective(container.CloseBraceToken.GetLocation()));
+		SyntaxTriviaList restore = SyntaxFactory.ParseLeadingTrivia("\n" + EvaluationSourceContext.Capture(model, container.CloseBraceToken.SpanStart) + EvaluationSourceContext.LineDirective(container.CloseBraceToken.GetLocation()));
 		changed = changed.WithCloseBraceToken(changed.CloseBraceToken.WithLeadingTrivia(changed.CloseBraceToken.LeadingTrivia.AddRange(restore)));
 		return root.ReplaceNode(container, changed);
 	}

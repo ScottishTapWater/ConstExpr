@@ -1,23 +1,13 @@
-using System.IO;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Operations;
 
 namespace ConstExpr.Roslyn.Evaluation;
 
 internal sealed class CallExpressionCompiler
 {
-	private readonly EvaluationAssemblyLoader _loader;
-
-	internal CallExpressionCompiler(EvaluationAssemblyLoader loader)
-	{
-		_loader = loader;
-	}
-
-	internal MethodInfo Compile(InvocationExpressionSyntax call, SemanticModel model, ITypeSymbol returnType, CancellationToken cancellationToken)
+	internal PreparedExpressionEvaluation Prepare(InvocationExpressionSyntax call, SemanticModel model, ITypeSymbol returnType, CancellationToken cancellationToken)
 	{
 		string name = "__ConstExprEvaluate" + Guid.NewGuid().ToString("N");
 		string marker = name + "Attribute";
@@ -54,21 +44,7 @@ internal sealed class CallExpressionCompiler
 			?? throw new InvalidOperationException("The extracted expression has no compiler binding.");
 		ExpressionBindingComparer.Verify(originalBinding, extractedBinding, cancellationToken);
 		compilation = compilation.WithAssemblyName(model.Compilation.AssemblyName + "." + name);
-		using MemoryStream stream = new();
-		EmitResult result = compilation.Emit(stream, cancellationToken: cancellationToken);
-		if (!result.Success)
-		{
-			throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
-		}
-		Assembly assembly = _loader.Load(stream.ToArray());
-		MethodInfo entrypoint = assembly.GetTypes()
-			.SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
-			.Single(method => method.GetCustomAttributesData().Any(attributeData => attributeData.AttributeType.FullName == marker));
-		if (entrypoint.ContainsGenericParameters || entrypoint.GetParameters().Length != 0)
-		{
-			throw new InvalidOperationException("The expression requires a closed, parameterless evaluation function.");
-		}
-		return entrypoint;
+		return new(compilation, marker);
 	}
 
 	private static StatementSyntax[] CreateHelpers(InvocationExpressionSyntax call, InvocationExpressionSyntax expressionCall,
@@ -77,7 +53,7 @@ internal sealed class CallExpressionCompiler
 		SyntaxNode? overflow = call.Ancestors().FirstOrDefault(node => node is CheckedExpressionSyntax or CheckedStatementSyntax);
 		bool isChecked = overflow is null ? ((CSharpCompilationOptions)model.Compilation.Options).CheckOverflow
 			: overflow.IsKind(SyntaxKind.CheckedExpression) || overflow.IsKind(SyntaxKind.CheckedStatement);
-		string expression = $"{(isChecked ? "checked" : "unchecked")}(\n{LineDirective(call.GetLocation())}__ConstExprInput\n)";
+		string expression = $"{(isChecked ? "checked" : "unchecked")}(\n{EvaluationSourceContext.LineDirective(call.GetLocation())}__ConstExprInput\n)";
 		string type = returnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat.WithMiscellaneousOptions(SymbolDisplayFormat.FullyQualifiedFormat.MiscellaneousOptions | SymbolDisplayMiscellaneousOptions.IncludeNullableReferenceTypeModifier));
 		bool awaits = call.DescendantNodes().OfType<AwaitExpressionSyntax>().Any(awaitExpression => SymbolEqualityComparer.Default.Equals(
 			model.GetEnclosingSymbol(awaitExpression.SpanStart, cancellationToken), model.GetEnclosingSymbol(call.SpanStart, cancellationToken)));
@@ -98,13 +74,6 @@ internal sealed class CallExpressionCompiler
 		return helpers;
 	}
 
-	internal static string LineDirective(Location location)
-	{
-		FileLinePositionSpan mapped = location.GetMappedLineSpan();
-		string path = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(mapped.Path, quote: true);
-		return $"#line {mapped.StartLinePosition.Line + 1} {path}\n";
-	}
-
 	private static ExpressionSyntax InlineHelpers(InvocationExpressionSyntax call, StatementSyntax[] helpers, ITypeSymbol returnType, string name)
 	{
 		// Initialisers and expression-bodied lambdas need a block without leaving their lexical scope.
@@ -112,15 +81,7 @@ internal sealed class CallExpressionCompiler
 		ExpressionSyntax expression = SyntaxFactory.ParseExpression($"((global::System.Func<{type}>)(static () => {{ __ConstExprBlock; }}))()");
 		BlockSyntax body = expression.DescendantNodes().OfType<BlockSyntax>().Single();
 		expression = expression.ReplaceNode(body, body.WithStatements(SyntaxFactory.List(helpers).Add(SyntaxFactory.ParseStatement($"return {name}();"))));
-		return RestoreSourceEnd(expression.WithLeadingTrivia(call.GetLeadingTrivia()), call);
-	}
-
-	private static ExpressionSyntax RestoreSourceEnd(ExpressionSyntax expression, ExpressionSyntax original)
-	{
-		FileLinePositionSpan mapped = original.GetLastToken().GetLocation().GetMappedLineSpan();
-		string path = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(mapped.Path, quote: true);
-		SyntaxTriviaList restore = SyntaxFactory.ParseLeadingTrivia($"\n#line {mapped.EndLinePosition.Line + 1} {path}\n");
-		return expression.WithTrailingTrivia(restore.AddRange(original.GetTrailingTrivia()));
+		return EvaluationSourceContext.RestoreSourceEnd(expression.WithLeadingTrivia(call.GetLeadingTrivia()), call);
 	}
 
 	private static ExpressionSyntax PreserveQuotedScope(LambdaExpressionSyntax[] scopes, int index, InvocationExpressionSyntax call,
@@ -136,8 +97,8 @@ internal sealed class CallExpressionCompiler
 		ExpressionSyntax result = SyntaxFactory.ParseExpression($"global::{marker}.PreserveQuote<{quotedType}>(__ConstExprQuote, ({delegateType})(__ConstExprDelegate))");
 		IdentifierNameSyntax quote = result.DescendantNodes().OfType<IdentifierNameSyntax>().Single(node => node.Identifier.Text == "__ConstExprQuote");
 		IdentifierNameSyntax implementation = result.DescendantNodes().OfType<IdentifierNameSyntax>().Single(node => node.Identifier.Text == "__ConstExprDelegate");
-		SyntaxTriviaList mapping = SyntaxFactory.ParseLeadingTrivia("\n" + LineDirective(original.GetLocation()));
+		SyntaxTriviaList mapping = SyntaxFactory.ParseLeadingTrivia("\n" + EvaluationSourceContext.LineDirective(original.GetLocation()));
 		result = result.ReplaceNodes([quote, implementation], (node, _) => node == quote ? original.WithLeadingTrivia(mapping) : executable.WithLeadingTrivia(mapping));
-		return RestoreSourceEnd(result, original);
+		return EvaluationSourceContext.RestoreSourceEnd(result, original);
 	}
 }

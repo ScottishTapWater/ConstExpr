@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace ConstExpr.Roslyn.Evaluation;
@@ -24,5 +25,20 @@ internal static class EvaluationSourceContext
 		source.AppendLine($"#nullable {(context.HasFlag(NullableContext.AnnotationsEnabled) ? "enable" : "disable")} annotations");
 		source.AppendLine($"#nullable {(context.HasFlag(NullableContext.WarningsEnabled) ? "enable" : "disable")} warnings");
 		return source.ToString();
+	}
+
+	internal static string LineDirective(Location location)
+	{
+		FileLinePositionSpan mapped = location.GetMappedLineSpan();
+		string path = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(mapped.Path, quote: true);
+		return $"#line {mapped.StartLinePosition.Line + 1} {path}\n";
+	}
+
+	internal static ExpressionSyntax RestoreSourceEnd(ExpressionSyntax expression, ExpressionSyntax original)
+	{
+		FileLinePositionSpan mapped = original.GetLastToken().GetLocation().GetMappedLineSpan();
+		string path = Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(mapped.Path, quote: true);
+		SyntaxTriviaList restore = SyntaxFactory.ParseLeadingTrivia($"\n#line {mapped.EndLinePosition.Line + 1} {path}\n");
+		return expression.WithTrailingTrivia(restore.AddRange(original.GetTrailingTrivia()));
 	}
 }

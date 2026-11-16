@@ -21,8 +21,8 @@ internal sealed class CallSiteProcessor
 		"Call to '{0}' uses a precomputed result; argument expressions still execute at runtime but their values are ignored. Move argument construction inside the [ConstExpr] method to avoid this runtime work.",
 		"ConstExpr", DiagnosticSeverity.Warning, true);
 	private static readonly DiagnosticDescriptor _inaccessibleSignature = new(
-		"CONSTEXPR005", "Parameter types are inaccessible to generated interceptors",
-		"Call to '{0}' will run at runtime because its parameter types are inaccessible to generated interceptors",
+		"CONSTEXPR005", "Signature types are inaccessible to generated interceptors",
+		"Call to '{0}' will run at runtime because its signature types are inaccessible to generated interceptors",
 		"ConstExpr", DiagnosticSeverity.Warning, true);
 #pragma warning restore RS2008
 
@@ -47,7 +47,7 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
-			if (method.Parameters.Any(parameter => !IsAccessible(parameter.Type, compilation)))
+			if (!IsAccessible(method.ReturnType, compilation) || method.Parameters.Any(parameter => !IsAccessible(parameter.Type, compilation)))
 			{
 				context.ReportDiagnostic(Diagnostic.Create(_inaccessibleSignature, call.GetLocation(), method.ToDisplayString()));
 				continue;

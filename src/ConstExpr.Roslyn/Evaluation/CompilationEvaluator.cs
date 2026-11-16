@@ -1,11 +1,8 @@
-using System.IO;
 using System.Reflection;
 using ConstExpr.Core.Evaluation;
-using ConstExpr.Core.Serialization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Emit;
 
 namespace ConstExpr.Roslyn.Evaluation;
 
@@ -13,27 +10,33 @@ internal sealed class CompilationEvaluator
 {
 	private readonly CSharpCompilation _compilation;
 	private readonly MethodEvaluator _evaluator;
-	private readonly ResultSerializer _serializer;
 	private readonly EvaluationAssemblyLoader _loader;
 	private readonly CallExpressionCompiler _expressions;
 	private readonly Dictionary<IMethodSymbol, Dictionary<ArgumentCacheKey, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
 	private int _nextResultId;
 
-	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer, EvaluationAssemblyLoader loader, CallExpressionCompiler expressions)
+	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, EvaluationAssemblyLoader loader, CallExpressionCompiler expressions)
 	{
 		_compilation = compilation;
 		_evaluator = evaluator;
-		_serializer = serializer;
 		_loader = loader;
 		_expressions = expressions;
 	}
 
 	internal EvaluatedResult EvaluateExpression(InvocationExpressionSyntax call, SemanticModel model, ITypeSymbol returnType, CancellationToken cancellationToken)
 	{
-		MethodInfo entrypoint = _expressions.Compile(call, model, returnType, cancellationToken);
+		PreparedExpressionEvaluation prepared = _expressions.Prepare(call, model, returnType, cancellationToken);
+		Assembly assembly = _loader.Load(prepared.Compilation, cancellationToken);
+		MethodInfo entrypoint = assembly.GetTypes()
+			.SelectMany(type => type.GetMethods(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.DeclaredOnly))
+			.Single(method => method.GetCustomAttributesData().Any(attribute => attribute.AttributeType.FullName == prepared.MarkerAttributeName));
+		if (entrypoint.ContainsGenericParameters || entrypoint.GetParameters().Length != 0)
+		{
+			throw new InvalidOperationException("The expression requires a closed, parameterless evaluation function.");
+		}
 		object? value = _evaluator.Evaluate(entrypoint, []);
-		string json = _serializer.Serialize(value, entrypoint.ReturnType);
+		string json = _loader.Serialize(value, entrypoint.ReturnType);
 		return new(_nextResultId++, json);
 	}
 
@@ -47,13 +50,13 @@ internal sealed class CompilationEvaluator
 		ArgumentCacheKey argumentKey = new(arguments);
 		if (!methodResults.TryGetValue(argumentKey, out EvaluatedResult? result))
 		{
-			_assembly ??= Compile(cancellationToken);
+			_assembly ??= _loader.Load(_compilation.WithAssemblyName(_compilation.AssemblyName + ".ConstExprEvaluation"), cancellationToken);
 			Type type = _assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
 			MethodInfo entrypoint = FindMethod(type, method);
 			ParameterInfo[] parameters = entrypoint.GetParameters();
 			object?[] values = arguments.Select((value, index) => parameters[index].ParameterType.IsEnum
 				? Enum.ToObject(parameters[index].ParameterType, value!) : value).ToArray();
-			string json = _serializer.Serialize(_evaluator.Evaluate(entrypoint, values), entrypoint.ReturnType);
+			string json = _loader.Serialize(_evaluator.Evaluate(entrypoint, values), entrypoint.ReturnType);
 			result = new(_nextResultId++, json);
 			methodResults.Add(argumentKey, result);
 		}
@@ -66,19 +69,6 @@ internal sealed class CompilationEvaluator
 			.Single(candidate => candidate.Name == method.MetadataName && !candidate.IsGenericMethod
 				&& candidate.GetParameters().Select(parameter => parameter.ParameterType.FullName)
 					.SequenceEqual(method.Parameters.Select(parameter => GetMetadataName((INamedTypeSymbol)parameter.Type))));
-	}
-
-	private Assembly Compile(CancellationToken cancellationToken)
-	{
-		using MemoryStream stream = new();
-		EmitResult result = _compilation.WithAssemblyName(_compilation.AssemblyName + ".ConstExprEvaluation")
-			.Emit(stream, cancellationToken: cancellationToken);
-		if (!result.Success)
-		{
-			throw new InvalidOperationException(string.Join("\n",
-				result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
-		}
-		return _loader.Load(stream.ToArray());
 	}
 
 	private static string GetMetadataName(INamedTypeSymbol type)
