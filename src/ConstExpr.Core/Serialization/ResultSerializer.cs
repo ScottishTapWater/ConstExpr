@@ -8,6 +8,7 @@ internal sealed class ResultSerializer
 	private readonly JsonSerializerOptions _options = new()
 	{
 		NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
+		ReferenceHandler = ReferenceHandler.Preserve,
 	};
 
 	public string Serialize(object? value, Type type)
