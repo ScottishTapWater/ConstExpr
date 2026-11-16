@@ -51,8 +51,8 @@ internal sealed class CallSiteProcessor
 			}
 			try
 			{
-				string literal = _evaluator.Evaluate(method, arguments, context.CancellationToken);
-				_source.Add(location, method.Parameters, literal);
+				EvaluatedResult result = _evaluator.Evaluate(method, arguments, context.CancellationToken);
+				_source.Add(location, method, result);
 			}
 			catch (Exception exception) when (exception is not OperationCanceledException)
 			{
@@ -71,7 +71,8 @@ internal sealed class CallSiteProcessor
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
 			&& !method.IsGenericMethod && !method.ContainingType.IsGenericType
 			&& method.Parameters.All(parameter => parameter.Type.SpecialType == SpecialType.System_Int32 && parameter.RefKind == RefKind.None)
-			&& !method.ReturnsByRef && !method.ReturnsByRefReadonly && method.ReturnType.SpecialType == SpecialType.System_Int32
+			&& !method.ReturnsVoid && !method.ReturnsByRef && !method.ReturnsByRefReadonly
+			&& !method.ReturnType.IsRefLikeType && method.ReturnType.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer)
 			&& method.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "ConstExpr.ConstExprAttribute");
 	}
 
