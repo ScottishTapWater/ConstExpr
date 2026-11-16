@@ -7,8 +7,8 @@ namespace ConstExpr.Roslyn.Tests;
 public sealed class RuntimeArgumentTests
 {
 	[Test]
-	[MethodDataSource(nameof(NonconstantArguments))]
-	public async Task NonconstantArgumentsReportAWarningAtTheCallSite(string argument)
+	[MethodDataSource(nameof(RuntimeDependentArguments))]
+	public async Task ArgumentsRequiringCallerRuntimeStateReportAWarningAtTheCallSite(string argument)
 	{
 		ConstExprGeneratorTest test = new();
 		test.TestState.Sources.Add(("Program.cs", $$"""
@@ -16,9 +16,7 @@ public sealed class RuntimeArgumentTests
 
 			public static class Counter
 			{
-				public static readonly int Input = 10;
-				public static int Property => 10;
-				public static int GetInput() => throw new System.InvalidOperationException("Argument must not run during compilation.");
+				public static int GetInput(int value) => throw new System.InvalidOperationException("Argument must not run during compilation.");
 
 				[ConstExpr]
 				public static int CountUp(int value) => throw new System.InvalidOperationException("Method must not run during compilation.");
@@ -33,7 +31,7 @@ public sealed class RuntimeArgumentTests
 	}
 
 	[Test]
-	public async Task CallsWithNonconstantArgumentsExecuteTheOriginalMethodAtRuntime()
+	public async Task CallsDependingOnCallerRuntimeStateExecuteTheOriginalMethodAtRuntime()
 	{
 		const string source = """
 			using ConstExpr;
@@ -100,5 +98,5 @@ public sealed class RuntimeArgumentTests
 		}
 	}
 
-	public static IEnumerable<string> NonconstantArguments() => ["value", "Input", "Property", "GetInput()"];
+	public static IEnumerable<string> RuntimeDependentArguments() => ["value", "GetInput(value)", "((System.Func<int>)(() => value))()"];
 }

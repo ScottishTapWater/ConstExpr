@@ -9,7 +9,7 @@ public sealed class MultipleRuntimeArgumentTests
 {
 	[Test]
 	[MethodDataSource(nameof(NonconstantArgumentLists))]
-	public async Task AnyNonconstantArgumentReportsOneWarningAtTheCallSite(NonconstantArgumentListTestCase testCase)
+	public async Task AnyArgumentRequiringCallerRuntimeStateReportsOneWarningAtTheCallSite(NonconstantArgumentListTestCase testCase)
 	{
 		ConstExprGeneratorTest test = new();
 		test.TestState.Sources.Add(("Program.cs", $$"""
@@ -17,7 +17,7 @@ public sealed class MultipleRuntimeArgumentTests
 
 			public static class Counter
 			{
-				public static int GetInput() => throw new System.InvalidOperationException("Argument must not run during compilation.");
+				public static int GetInput(int value) => throw new System.InvalidOperationException("Argument must not run during compilation.");
 
 				[ConstExpr]
 				public static int Encode(int left, int middle, int right) => throw new System.InvalidOperationException("Method must not run during compilation.");
@@ -43,7 +43,7 @@ public sealed class MultipleRuntimeArgumentTests
 				private static int argumentCalls;
 				private static int methodCalls;
 
-				private static int Next() => ++argumentCalls;
+				private static int Next(int value) => ++argumentCalls;
 
 				[ConstExpr]
 				public static int Encode(int left, int middle, int right)
@@ -54,7 +54,8 @@ public sealed class MultipleRuntimeArgumentTests
 
 				public static MultipleRuntimeArgumentTests.RuntimeArgumentExecutionResult Run()
 				{
-					int value = Encode(right: Next(), left: Next(), middle: Next());
+					int input = 0;
+					int value = Encode(right: Next(input), left: Next(input), middle: Next(input));
 					return new(value, argumentCalls, methodCalls);
 				}
 			}
@@ -105,7 +106,7 @@ public sealed class MultipleRuntimeArgumentTests
 		yield return () => new("Last argument", "1, 2, value");
 		yield return () => new("Every argument", "value, value, value");
 		yield return () => new("Reordered named argument", "right: value, left: 1, middle: 2");
-		yield return () => new("Runtime expression", "1, 2, GetInput()");
+		yield return () => new("Runtime expression", "1, 2, GetInput(value)");
 	}
 
 	public sealed record NonconstantArgumentListTestCase(string Name, string Arguments)

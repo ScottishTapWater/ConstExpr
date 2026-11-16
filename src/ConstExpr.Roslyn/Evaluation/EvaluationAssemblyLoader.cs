@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
 using System.IO;
 using System.Reflection;
+using ConstExpr.Core.Serialization;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 
 namespace ConstExpr.Roslyn.Evaluation;
 
@@ -9,64 +12,112 @@ namespace ConstExpr.Roslyn.Evaluation;
 internal sealed class EvaluationAssemblyLoader : IDisposable
 {
 	private readonly ILookup<string, string> _paths;
-	private readonly ConcurrentDictionary<Assembly, byte> _owned = new();
+	private readonly HashSet<string> _referencePaths;
+	private readonly string _contextName;
+	private HashSet<string>? _frameworkNames;
+	private readonly string _serializerPath = typeof(ResultSerializer).Assembly.Location;
 	private readonly ConcurrentDictionary<string, Lazy<Assembly?>> _dependencies = new(StringComparer.OrdinalIgnoreCase);
-	private bool _subscribed;
+	private readonly ConcurrentDictionary<string, Lazy<Assembly>> _loaded = new(StringComparer.OrdinalIgnoreCase);
+	private CollectibleEvaluationContext? _context;
+	private object? _serializer;
+	private MethodInfo? _serialize;
 
 	internal EvaluationAssemblyLoader(Compilation compilation, IEnumerable<string> runtimePaths)
 	{
-		_paths = runtimePaths.Concat(compilation.References.OfType<PortableExecutableReference>()
-			.Select(reference => reference.FilePath).OfType<string>())
-			.Distinct(StringComparer.Ordinal)
-			.ToLookup(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase);
+		PortableExecutableReference[] references = compilation.References.OfType<PortableExecutableReference>().ToArray();
+		string[] paths = runtimePaths.Concat(references.Select(reference => reference.FilePath).OfType<string>())
+			.Distinct(StringComparer.Ordinal).Where(File.Exists).ToArray();
+		_paths = paths.ToLookup(path => Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase);
+		_referencePaths = new(references.Where(reference => compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly
+			&& assembly.GetAttributes().Any(attribute => attribute.AttributeClass?.ToDisplayString() == "System.Runtime.CompilerServices.ReferenceAssemblyAttribute"))
+			.Select(reference => reference.FilePath).OfType<string>(), StringComparer.Ordinal);
+		_contextName = compilation.AssemblyName + ".ConstExpr." + Guid.NewGuid().ToString("N");
 	}
 
-	internal Assembly Load(byte[] image)
+	internal Assembly Load(CSharpCompilation compilation, CancellationToken cancellationToken)
 	{
-		if (!_subscribed)
+		using MemoryStream stream = new();
+		EmitResult result = compilation.Emit(stream, cancellationToken: cancellationToken);
+		if (!result.Success)
 		{
-			AppDomain.CurrentDomain.AssemblyResolve += Resolve;
-			_subscribed = true;
+			throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
 		}
-		return LoadImage(image);
+		EnsureContext();
+		return _context!.Load(stream.ToArray());
 	}
 
-	private Assembly LoadImage(byte[] image)
+	internal string Serialize(object? value, Type type)
 	{
-		Assembly assembly = Assembly.Load(image);
-		_owned.TryAdd(assembly, 0);
-		return assembly;
+		return (string)_serialize!.Invoke(_serializer, [value, type])!;
 	}
 
-	private Assembly? Resolve(object? sender, ResolveEventArgs args)
+	private void EnsureContext()
 	{
-		if (args.RequestingAssembly is null || !_owned.ContainsKey(args.RequestingAssembly))
+		if (_context is not null)
+		{
+			return;
+		}
+		_frameworkNames = new(Directory.GetFiles(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "*.dll")
+			.Select(Path.GetFileNameWithoutExtension), StringComparer.OrdinalIgnoreCase);
+		_context = new CollectibleEvaluationContext(_contextName, Resolve);
+		string jsonPath = ResultSerializer.JsonAssembly.Location;
+		// JSON reflection caches must live with the evaluated types, not in the compiler host.
+		LoadPrivate(jsonPath);
+		Assembly core = LoadPrivate(_serializerPath);
+		Type serializerType = core.GetType(typeof(ResultSerializer).FullName!, throwOnError: true)!;
+		_serializer = Activator.CreateInstance(serializerType, nonPublic: true);
+		_serialize = serializerType.GetMethod(nameof(ResultSerializer.Serialize), [typeof(object), typeof(Type)])!;
+	}
+
+	private Assembly LoadPrivate(string path)
+	{
+		AssemblyName name = AssemblyName.GetAssemblyName(path);
+		return _loaded.GetOrAdd(name.FullName, _ => new(() => _context!.Load(File.ReadAllBytes(path)))).Value;
+	}
+
+	private Assembly? Resolve(AssemblyName requested)
+	{
+		if (_frameworkNames!.Contains(requested.Name!))
 		{
 			return null;
 		}
-		return _dependencies.GetOrAdd(args.Name, name => new(() => LoadDependency(name))).Value;
+		return _dependencies.GetOrAdd(requested.FullName, _ => new(() => LoadDependency(requested))).Value;
 	}
 
-	private Assembly? LoadDependency(string name)
+	private Assembly? LoadDependency(AssemblyName requested)
 	{
-		AssemblyName requested = new(name);
-		foreach (string path in _paths[requested.Name!])
+		IEnumerable<string> candidates = _paths[requested.Name!].Concat([Path.Combine(Path.GetDirectoryName(_serializerPath)!, requested.Name + ".dll")]);
+		foreach (string path in candidates.Where(path => File.Exists(path) && !_referencePaths.Contains(path)))
 		{
-			if (string.Equals(AssemblyName.GetAssemblyName(path).FullName, requested.FullName, StringComparison.OrdinalIgnoreCase))
+			AssemblyName actual;
+			try
 			{
-				return LoadImage(File.ReadAllBytes(path));
+				actual = AssemblyName.GetAssemblyName(path);
+			}
+			catch (BadImageFormatException)
+			{
+				continue;
+			}
+			if (string.Equals(actual.Name, requested.Name, StringComparison.OrdinalIgnoreCase)
+				&& string.Equals(actual.CultureName ?? "", requested.CultureName ?? "", StringComparison.OrdinalIgnoreCase)
+				&& (requested.Version is null || actual.Version >= requested.Version)
+				&& (requested.Version is null || (actual.GetPublicKeyToken() ?? []).SequenceEqual(requested.GetPublicKeyToken() ?? [])))
+			{
+				return LoadPrivate(path);
 			}
 		}
-		return null;
+		throw new FileNotFoundException($"No compatible runtime assembly was found for isolated ConstExpr evaluation: '{requested.FullName}'.", requested.Name + ".dll");
 	}
 
 	public void Dispose()
 	{
-		if (_subscribed)
-		{
-			AppDomain.CurrentDomain.AssemblyResolve -= Resolve;
-			_subscribed = false;
-		}
+		_serializer = null;
+		_serialize = null;
+		_loaded.Clear();
+		_dependencies.Clear();
+		CollectibleEvaluationContext? context = _context;
+		_context = null;
+		context?.Dispose();
 	}
 }
 #pragma warning restore RS1035

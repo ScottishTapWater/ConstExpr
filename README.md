@@ -2,15 +2,25 @@
 
 A C# analyser and source generator library targeting .NET Standard 2.0.
 
-The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json and are deserialised once into a shared static field per method and argument combination. Collections, ordinary DTOs, and null results are supported. Parameters support C# constant types: strings, characters, booleans, numeric primitives, decimals, and enums. Calls with constant arguments are intercepted; calls with any nonconstant argument report warning `CONSTEXPR002` and run normally at runtime. Consumers must enable interception for the `ConstExpr.Generated` namespace.
+The generator evaluates static `[ConstExpr]` methods during compilation and generates interceptors that return their precomputed values. Results use System.Text.Json. Collections, ordinary DTOs, and null results are supported. Consumers must enable interception for the `ConstExpr.Generated` namespace.
 
-Compiled and interpreted expression-tree calls are intercepted with the supported compiler. Method-group delegates, dynamically bound calls to marked methods, reflection invocations and managed function pointers execute the original method.
+Arguments can be C# expressions, including constructors, collection expressions, queries, static factories, fields, properties, lambdas and awaited inputs. Input objects do not need to be serialisable. Expressions execute against the build environment; ConstExpr does not prove purity or determinism. Arguments requiring caller runtime locals, parameters, an instance or unresolved generic types report warning `CONSTEXPR002` and leave the call running normally at runtime. Following local assignments is not supported.
 
-Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`. Each method and argument combination has its own shared graph.
+Return and parameter types must be accessible to generated interceptors. Calls whose signatures contain private or file-local types report warning `CONSTEXPR005` and run normally at runtime.
+
+Successfully precomputed calls with nonconstant arguments report warning `CONSTEXPR004`: argument expressions still execute at runtime, but their values are ignored, even if those values change. Move argument construction inside the `[ConstExpr]` method to avoid that runtime work.
+
+Constant scalar arguments share one reconstructed result per method and argument combination. Other calls share one reconstructed result per call site. ConstExpr does not compare arbitrary input object graphs to merge results between call sites.
+
+Compiled and interpreted expression-tree calls are intercepted with the supported compiler. Method-group delegates, dynamically bound calls to marked methods, reflection invocations and managed function pointers execute the original method. Method-group conversions and taking a method's address report warning `CONSTEXPR003`.
+
+Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`.
 
 Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
 
-Evaluation currently compiles and loads the original compilation inside the compiler process. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Isolated execution is outside the current implementation.
+Expression evaluation adds uniquely marked static local functions to a build-only compilation. Nongeneric callers retain their lexical scope. Independent expressions in generic callers use a separate nongeneric scope without guessing type arguments. Extraction preserves the original expression text and source context. Before execution, it verifies selected members, conversions, typed constants and compiler-supplied arguments against the original compiler binding. A binding mismatch reports `CONSTEXPR001`.
+
+Evaluation prepares and verifies this temporary compilation before emission and execution inside a collectible load context. Its serializer and private dependencies share that context, and only serialised results are retained after evaluation. Contexts are unloaded after each generator run. Scalar evaluations retain their existing shared build-time state and cache; separate expression call sites retain independent build-time state. The package's MSBuild target supplies resolved runtime assembly paths for project and NuGet dependencies. Methods must be compilable before generated source is added. Evaluation helpers do not ship in the application. Execution still occurs in the compiler process; process isolation is outside the current implementation.
 
 ## Structure
 
@@ -27,7 +37,7 @@ Roslyn references Core and contracts. Core references contracts. ArchonAnalysers
 
 The three production projects target `netstandard2.0`. Test projects target `net10.0`. One `ConstExpr` package contains the contracts assembly under `lib/netstandard2.0` and all three production assemblies under `analyzers/dotnet/cs` for generator dependency resolution. System.Text.Json and its transitive dependencies are bundled beside the generator, and a public System.Text.Json package dependency supplies runtime deserialisation. Core and Roslyn are not runtime references for applications. No Archon, Roslyn, or test package dependencies are exposed to consumers.
 
-The generator uses Roslyn 5.0 and requires a compatible compiler host, such as the .NET 10 SDK.
+The generator uses Roslyn 5.0. Evaluation requires a compiler host with collectible assembly loading, such as the .NET 10 SDK. The analyser and Core assemblies remain `netstandard2.0`.
 
 ## Build and check the package
 
