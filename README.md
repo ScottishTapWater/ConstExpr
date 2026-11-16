@@ -6,7 +6,9 @@ The generator evaluates static `[ConstExpr]` methods during compilation and gene
 
 Shared references and cycles in STJ-supported object graphs are preserved using `ReferenceHandler.Preserve`. Each method and argument combination has its own shared graph.
 
-Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. Isolated execution and custom converters are outside the current implementation.
+Type-level `[JsonConverter]` attributes are honoured during build-time serialisation and runtime reconstruction.
+
+Evaluation currently compiles and loads the original compilation inside the compiler process. Methods must be compilable before generated source is added. Isolated execution is outside the current implementation.
 
 ## Structure
 
