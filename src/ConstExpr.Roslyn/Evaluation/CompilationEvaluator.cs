@@ -13,15 +13,17 @@ internal sealed class CompilationEvaluator
 	private readonly CSharpCompilation _compilation;
 	private readonly MethodEvaluator _evaluator;
 	private readonly ResultSerializer _serializer;
+	private readonly EvaluationAssemblyLoader _loader;
 	private readonly Dictionary<IMethodSymbol, Dictionary<ArgumentCacheKey, EvaluatedResult>> _results = new(SymbolEqualityComparer.Default);
 	private Assembly? _assembly;
 	private int _nextResultId;
 
-	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer)
+	internal CompilationEvaluator(CSharpCompilation compilation, MethodEvaluator evaluator, ResultSerializer serializer, EvaluationAssemblyLoader loader)
 	{
 		_compilation = compilation;
 		_evaluator = evaluator;
 		_serializer = serializer;
+		_loader = loader;
 	}
 
 	internal EvaluatedResult Evaluate(IMethodSymbol method, object?[] arguments, CancellationToken cancellationToken)
@@ -65,9 +67,7 @@ internal sealed class CompilationEvaluator
 			throw new InvalidOperationException(string.Join("\n",
 				result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)));
 		}
-#pragma warning disable RS1035 // Executing the user's method is the purpose of this generator.
-		return Assembly.Load(stream.ToArray());
-#pragma warning restore RS1035
+		return _loader.Load(stream.ToArray());
 	}
 
 	private static string GetMetadataName(INamedTypeSymbol type)

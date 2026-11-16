@@ -1,0 +1,12 @@
+<Project>
+  <ItemGroup>
+    <CompilerVisibleProperty Include="ConstExprRuntimeAssemblies" />
+  </ItemGroup>
+  <Target Name="CollectConstExprRuntimeAssemblies"
+          BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun"
+          DependsOnTargets="ResolveReferences">
+    <PropertyGroup>
+      <ConstExprRuntimeAssemblies>@(ReferenceCopyLocalPaths->'%(FullPath)', '|')</ConstExprRuntimeAssemblies>
+    </PropertyGroup>
+  </Target>
+</Project>
