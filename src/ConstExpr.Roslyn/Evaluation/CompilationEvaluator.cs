@@ -51,8 +51,8 @@ internal sealed class CompilationEvaluator
 		if (!methodResults.TryGetValue(argumentKey, out EvaluatedResult? result))
 		{
 			_assembly ??= _loader.Load(_compilation.WithAssemblyName(_compilation.AssemblyName + ".ConstExprEvaluation"), cancellationToken);
-			Type type = _assembly.GetType(GetMetadataName(method.ContainingType), throwOnError: true)!;
-			MethodInfo entrypoint = FindMethod(type, method);
+			EvaluationMethodResolver resolver = new(_compilation.Assembly, _assembly, _loader);
+			MethodInfo entrypoint = resolver.Resolve(method);
 			ParameterInfo[] parameters = entrypoint.GetParameters();
 			object?[] values = arguments.Select((value, index) => parameters[index].ParameterType.IsEnum
 				? Enum.ToObject(parameters[index].ParameterType, value!) : value).ToArray();
@@ -61,21 +61,5 @@ internal sealed class CompilationEvaluator
 			methodResults.Add(argumentKey, result);
 		}
 		return result;
-	}
-
-	private static MethodInfo FindMethod(Type type, IMethodSymbol method)
-	{
-		return type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-			.Single(candidate => candidate.Name == method.MetadataName && !candidate.IsGenericMethod
-				&& candidate.GetParameters().Select(parameter => parameter.ParameterType.FullName)
-					.SequenceEqual(method.Parameters.Select(parameter => GetMetadataName((INamedTypeSymbol)parameter.Type))));
-	}
-
-	private static string GetMetadataName(INamedTypeSymbol type)
-	{
-		return type.ContainingType is not null
-			? GetMetadataName(type.ContainingType) + "+" + type.MetadataName
-			: type.ContainingNamespace.IsGlobalNamespace ? type.MetadataName
-				: type.ContainingNamespace.ToDisplayString() + "." + type.MetadataName;
 	}
 }

@@ -51,6 +51,8 @@ internal sealed class EvaluationAssemblyLoader : IDisposable
 		return (string)_serialize!.Invoke(_serializer, [value, type])!;
 	}
 
+	internal Assembly LoadRuntimeAssembly(AssemblyName name) => _context!.Load(name);
+
 	private void EnsureContext()
 	{
 		if (_context is not null)

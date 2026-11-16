@@ -47,6 +47,11 @@ internal sealed class CallSiteProcessor
 				continue;
 			}
 			IMethodSymbol method = invocation.TargetMethod;
+			if (!ArgumentExpressionAnalysis.HasClosedTypes(method))
+			{
+				context.ReportDiagnostic(Diagnostic.Create(_callerRuntimeState, call.GetLocation(), method.ToDisplayString()));
+				continue;
+			}
 			if (!IsAccessible(method.ReturnType, compilation) || method.Parameters.Any(parameter => !IsAccessible(parameter.Type, compilation)))
 			{
 				context.ReportDiagnostic(Diagnostic.Create(_inaccessibleSignature, call.GetLocation(), method.ToDisplayString()));
@@ -91,7 +96,6 @@ internal sealed class CallSiteProcessor
 	private static bool IsSupported(IMethodSymbol method)
 	{
 		return method.IsStatic && method.MethodKind == MethodKind.Ordinary
-			&& !method.IsGenericMethod && !method.ContainingType.IsGenericType
 			&& method.Parameters.All(parameter => parameter.RefKind == RefKind.None && !parameter.Type.IsRefLikeType
 				&& parameter.Type.TypeKind is not (TypeKind.Pointer or TypeKind.FunctionPointer))
 			&& !method.ReturnsVoid && !method.ReturnsByRef && !method.ReturnsByRefReadonly

@@ -12,6 +12,7 @@ internal sealed class CollectibleEvaluationContext : IDisposable
 	private readonly object _bootstrap;
 	private readonly object _context;
 	private readonly MethodInfo _loadFromStream;
+	private readonly MethodInfo _loadFromAssemblyName;
 	private readonly MethodInfo _unload;
 
 	internal CollectibleEvaluationContext(string name, Func<AssemblyName, Assembly?> resolve)
@@ -19,6 +20,7 @@ internal sealed class CollectibleEvaluationContext : IDisposable
 		Type contextType = GetContextType();
 		ConstructorInfo constructor = contextType.GetConstructor([typeof(string), typeof(bool)])!;
 		_loadFromStream = contextType.GetMethod("LoadFromStream", [typeof(Stream)])!;
+		_loadFromAssemblyName = contextType.GetMethod("LoadFromAssemblyName", [typeof(AssemblyName)])!;
 		_unload = contextType.GetMethod("Unload", Type.EmptyTypes)!;
 		_bootstrap = constructor.Invoke([name + ".bootstrap", true]);
 		try
@@ -40,6 +42,8 @@ internal sealed class CollectibleEvaluationContext : IDisposable
 		using MemoryStream stream = new(image, writable: false);
 		return (Assembly)_loadFromStream.Invoke(_context, [stream])!;
 	}
+
+	internal Assembly Load(AssemblyName name) => (Assembly)_loadFromAssemblyName.Invoke(_context, [name])!;
 
 	public void Dispose()
 	{
